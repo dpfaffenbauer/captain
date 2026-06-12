@@ -76,6 +76,15 @@ export function ClusterSwitcherSheet({
       >
         <Text style={styles.addText}>+ Add cluster</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.homeRow}
+        onPress={() => {
+          onClose();
+          router.dismissTo('/');
+        }}
+      >
+        <Text style={styles.homeText}>⌂ All clusters</Text>
+      </TouchableOpacity>
     </BottomSheet>
   );
 }
@@ -241,6 +250,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addText: { color: colors.link, fontSize: 14, fontWeight: '600' },
+  homeRow: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.card,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  homeText: { color: colors.textDim, fontSize: 14, fontWeight: '600' },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: 2 },
   profileBadge: {
     width: 46,
