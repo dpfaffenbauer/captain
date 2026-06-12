@@ -30,6 +30,7 @@ export default function BrowseScreen() {
   const { namespace } = useClusterScope();
 
   const [categories, setCategories] = useState<ResourceCategory[]>([]);
+  const [hasGitOps, setHasGitOps] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [nsOpen, setNsOpen] = useState(false);
@@ -43,6 +44,13 @@ export default function BrowseScreen() {
     try {
       const types = await discoverResourceTypes(cluster);
       setCategories(categorizeResourceTypes(types.filter((type) => type.verbs.includes('list'))));
+      setHasGitOps(
+        types.some(
+          (type) =>
+            (type.group === 'argoproj.io' && type.kind === 'Application') ||
+            type.group.endsWith('.toolkit.fluxcd.io')
+        )
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -112,6 +120,22 @@ export default function BrowseScreen() {
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
+              {hasGitOps ? (
+                <TouchableOpacity
+                  style={[
+                    styles.row,
+                    { borderTopColor: colors.borderFaint, borderTopWidth: StyleSheet.hairlineWidth },
+                  ]}
+                  onPress={() => router.push({ pathname: '/cluster/[id]/gitops', params: { id } })}
+                >
+                  <SquircleIcon abbr="Go" color="#F4845C" />
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Text style={styles.rowLabel}>GitOps</Text>
+                    <Text style={styles.rowSub}>Argo CD · Flux · sync status</Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </TouchableOpacity>
+              ) : null}
             </Card>
           </View>
 
