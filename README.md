@@ -1,177 +1,176 @@
 # Captain ⎈
 
-Ein Kubernetes-Client für iOS, gebaut mit React Native (Expo). Captain entdeckt
-**alle** Ressourcen-Typen eines Clusters dynamisch über die Discovery-API —
-inklusive CRDs — und kann jede Ressource anzeigen, als YAML bearbeiten und
-löschen. Authentifizierung wird für die großen Cloud-Anbieter (AWS EKS,
-Google GKE, Azure AKS) sowie für Bearer-Tokens und Client-Zertifikate
-unterstützt.
+A Kubernetes client for iOS, built with React Native (Expo). Captain discovers
+**all** of a cluster's resource types dynamically via the discovery API —
+including CRDs — and can display, edit as YAML, and delete every resource.
+Authentication is supported for the major cloud providers (AWS EKS,
+Google GKE, Azure AKS) as well as bearer tokens and client certificates.
 
-Das UI folgt dem Screendesign **„Captain v2 · Soft Bridge"** (Claude-Design-
-Handoff): dunkles Indigo-Theme, Karten mit sanftem Verlauf, Squircle-Icons im
-iOS-Settings-Stil, Health-Ring-Dashboard, Floating-Tab-Bar (Cluster · Browse ·
-Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
+The UI follows the **"Captain v2 · Soft Bridge"** screen design (Claude design
+handoff): dark indigo theme, cards with subtle gradients, squircle icons in the
+iOS Settings style, health-ring dashboard, floating tab bar (Cluster · Browse ·
+Events), and bottom sheets for cluster and namespace selection.
 
 ## Features
 
-- **Multi-Cluster**: beliebig viele Cluster, sicher gespeichert im iOS-Keychain
+- **Multi-cluster**: any number of clusters, stored securely in the iOS Keychain
   (expo-secure-store).
-- **Alle Ressourcen-Typen**: dynamische Discovery über `/api/v1` und `/apis/…`
-  — Pods, Deployments, CRDs, alles was der API-Server kennt.
-- **Kuratierte Übersicht** (à la Lens): auf-/zuklappbare Kategorien — Cluster
+- **All resource types**: dynamic discovery via `/api/v1` and `/apis/…`
+  — Pods, Deployments, CRDs, everything the API server knows about.
+- **Curated overview** (à la Lens): collapsible categories — Cluster
   (Nodes, Namespaces, Events), Workloads (Pods, Deployments, StatefulSets,
   DaemonSets, ReplicaSets, Jobs, CronJobs …), Config (Secrets, ConfigMaps,
-  Quotas, HPA, PDB, Webhooks …), Netzwerk (Services, Ingresses,
+  Quotas, HPA, PDB, Webhooks …), Network (Services, Ingresses,
   EndpointSlices, NetworkPolicies …), Storage (PVC, PV, StorageClasses),
-  Zugriffskontrolle (ServiceAccounts, RBAC) sowie **Custom Resources**
-  automatisch gruppiert nach API-Gruppe; alles Übrige unter „Sonstiges".
-- **Lesen, Bearbeiten, Löschen**: Listen mit Namespace-Filter, Pagination und
-  Suche; Detailansicht als YAML; Bearbeiten im YAML-Editor mit **Diff-Vorschau**
-  vor dem Speichern und **Server-Side Apply** (`fieldManager=captain`,
-  `force=true`) — kein 409-Konflikt-Tanz mehr; Löschen mit Bestätigung.
-- **Live-Listen (Watch-API)**: Nach dem initialen Listing hält ein
-  `?watch=true`-Stream die Liste aktuell — Pods erscheinen/verschwinden in
-  Echtzeit, mit automatischem Re-List bei abgelaufener resourceVersion.
-- **Live-Logs**: echtes `kubectl logs -f`-Streaming über das native Modul
-  (chunked URLSession), inkl. Suche im Log, Multi-Container, Previous-Logs
-  und Teilen/Export. In Expo Go fällt Follow auf Polling zurück.
-- **Node-Aktionen**: Cordon/Uncordon sowie Drain über die
-  `policy/v1`-Eviction-Subresource — DaemonSet-/Mirror-Pods bleiben stehen,
-  PodDisruptionBudgets werden respektiert (Ablehnungen erscheinen im Ergebnis).
-- **Helm-Releases**: Releases werden direkt aus den
-  `sh.helm.release.v1`-Secrets gelesen (kein Helm-CLI nötig): Liste mit Status,
-  pro Release Chart-Infos, Revision-History, Values, gerendertes Manifest und
-  Notes (gzip-Payload wird on-device dekodiert).
-- **GitOps (Argo CD / Flux)**: Werden die CRDs entdeckt, zeigt Browse eine
-  GitOps-Ansicht mit Sync-/Health-Status von Applications, Kustomizations und
-  HelmReleases; „Sync"/„Reconcile" funktioniert rein über den API-Server
+  Access Control (ServiceAccounts, RBAC), plus **Custom Resources**
+  automatically grouped by API group; everything else under "Other".
+- **Read, edit, delete**: lists with namespace filter, pagination, and
+  search; detail view as YAML; editing in the YAML editor with **diff preview**
+  before saving and **server-side apply** (`fieldManager=captain`,
+  `force=true`) — no more 409-conflict dance; deletion with confirmation.
+- **Live lists (watch API)**: after the initial listing, a
+  `?watch=true` stream keeps the list up to date — pods appear/disappear in
+  real time, with an automatic re-list when the resourceVersion expires.
+- **Live logs**: real `kubectl logs -f` streaming via the native module
+  (chunked URLSession), including in-log search, multi-container, previous logs,
+  and share/export. In Expo Go, follow falls back to polling.
+- **Node actions**: cordon/uncordon as well as drain via the
+  `policy/v1` eviction subresource — DaemonSet/mirror pods are left in place,
+  PodDisruptionBudgets are respected (rejections show up in the result).
+- **Helm releases**: releases are read directly from the
+  `sh.helm.release.v1` secrets (no Helm CLI needed): list with status,
+  per-release chart info, revision history, values, rendered manifest, and
+  notes (the gzip payload is decoded on-device).
+- **GitOps (Argo CD / Flux)**: if the CRDs are discovered, Browse shows a
+  GitOps view with sync/health status of Applications, Kustomizations, and
+  HelmReleases; "Sync"/"Reconcile" works purely through the API server
   (Argo: `.operation.sync`, Flux: `reconcile.fluxcd.io/requestedAt`).
-- **Related Resources**: Die Detailansicht verlinkt Owner (ownerReferences)
-  und Kinder (Deployment → ReplicaSets/Pods, Service → Pods, Ingress →
-  Services, PVC ↔ Volume/Pods, Pod → Node/PVCs) zum Durchnavigieren.
-- **Favoriten/Pins**: Jede Ressource lässt sich in der Detailansicht über den
-  Stern anheften; der Home-Screen zeigt einen „Pinned"-Bereich mit allen
-  angehefteten Objekten **über alle Cluster hinweg** — ein Tap springt direkt
-  zur Ressource, langes Drücken entfernt den Pin. Gespeichert im Keychain
-  (expo-secure-store), damit die Pins einen App-Neustart überleben.
-- **Multi-Cluster-Dashboard**: Der Home-Screen prüft alle Cluster parallel
-  (Node-Readiness, Problem-Pods) und zeigt Ampel-Status plus Kurzzusammen-
-  fassung pro Cluster.
-- **Home-Screen-Widget** (WidgetKit): Small/Medium-Widget mit dem
-  Health-Status aller Cluster (Ampel pro Cluster, „x/y clusters healthy").
-  Die App schreibt bei jedem Health-Check einen Snapshot in die App Group
-  (`group.at.pfaffenbauer.captain`) und stößt den Widget-Reload an; das
-  Widget zeigt also den Stand des letzten App-Starts.
-- **Hintergrund-Alerts** (optional): ein BGTaskScheduler-Task prüft die
-  Cluster periodisch im Hintergrund, aktualisiert das Widget und meldet
-  Verschlechterungen per lokaler Notification (dedupliziert; iOS plant die
-  Läufe opportunistisch — Best Effort, kein Monitoring-Ersatz).
-- **Interaktives Terminal**: neben One-Shot-Kommandos gibt es einen
-  Interactive-Modus — eine persistente `kubectl exec -it`-Session (PTY,
-  stdin über den offenen WebSocket, ANSI-Sequenzen werden gefiltert).
-- **Live Activity** (iOS 16.2+): aktive Port-Forwards erscheinen als
-  Live-Aktivität auf dem Sperrbildschirm und in der Dynamic Island.
-- **Siri / Shortcuts** (App Intents): „Check cluster health" beantwortet
-  Siri headless aus dem letzten Health-Snapshot; „Open Cluster" (iOS 18+)
-  öffnet einen Cluster per Deep Link (`captain://open?cluster=<name>`).
-- **iPad-Split-View**: ab 768 pt Breite zeigt die Ressourcen-Liste links die
-  Liste und rechts einen Inspector (Summary, Events, YAML) für das gewählte
-  Objekt; Browse- und Home-Inhalte werden zentriert begrenzt.
-- **Face-ID-App-Lock** (optional): verbirgt die App-Inhalte bei Kaltstart und
-  Rückkehr aus dem Hintergrund, bis Face ID/Touch ID bzw. der Geräte-Code
-  bestätigt wurde.
-- **Auth für Cloud-Anbieter**:
-  - **AWS EKS**: SigV4-presigned STS-Token (`k8s-aws-v1.…`), äquivalent zu
-    `aws eks get-token` — komplett on-device, keine CLI nötig.
-  - **Google GKE**: OAuth 2.0 (PKCE) mit Refresh-Token.
-  - **Azure AKS**: Microsoft Entra ID OAuth 2.0 (PKCE) gegen die
-    AKS-AAD-Server-App.
-  - **Generisches OIDC** (Keycloak, Dex, Authentik …): Authorization Code +
-    PKCE gegen das Discovery-Dokument des Issuers; das ID-Token wird als
-    Bearer gesendet und automatisch erneuert.
-  - **Bearer-Token**: z. B. ServiceAccount-Tokens.
-  - **Client-Zertifikate (mTLS)**: PEM-Zertifikat + Key direkt aus der
-    Kubeconfig (RSA und EC), nativ über URLSession; alternativ PKCS#12.
-- **Kubeconfig-Import**: YAML einfügen, Kontexte auswählen, fertig. Exec-Plugins
-  (`aws`, `gke-gcloud-auth-plugin`, `kubelogin`) werden erkannt und auf die
-  passende native Auth-Methode gemappt.
-- **Eigene Cluster-CAs**: Das native Modul `KubeHttp` validiert die
-  Server-Zertifikate gegen die in der Kubeconfig hinterlegte CA
-  (`certificate-authority-data`) — nötig, weil EKS/GKE/AKS-Endpunkte von
-  cluster-eigenen CAs signiert sind.
-- **Exec-Terminal**: One-Shot-Kommandos via `kubectl exec`-WebSocket
-  (`v4.channel.k8s.io`), nativ mit Cluster-CA-Trust — inkl. Quick-Command-
-  Chips im Terminal-UI.
-- **Port-Forwarding**: lokaler TCP-Listener (Network.framework) bridgt auf
-  den `portforward`-WebSocket-Endpunkt; aktive Forwards erscheinen im
-  Browse-Tab unter Network und sind einzeln stoppbar.
-- **Live-Metriken**: Node- und Pod-Usage über die metrics-server-API
-  (`metrics.k8s.io`) — CPU/Memory-Balken in der Node-Liste, CPU-Spalte in
-  der Pod-Liste; ohne metrics-server blendet sich das automatisch aus.
-- **Prometheus-Integration**: Captain findet Prometheus im Cluster automatisch
-  (bekannte Service-Namen/Labels) und fragt es **über den API-Server-Proxy** ab
-  — keine zusätzliche Netzwerk- oder Auth-Konfiguration nötig, die bestehende
-  Cluster-Verbindung (CA-Trust, Token, mTLS) reicht. Im Dashboard erscheinen
-  CPU-/Memory-Verläufe der letzten Stunde als Sparklines sowie die aktuell
-  **feuernden Alerts** (nach Schweregrad sortiert, Pod-Alerts öffnen direkt die
-  Ressource). „View all" öffnet eine eigene Alerts-Seite mit Severity-Filter;
-  ein Tap auf einen Alert zeigt Beschreibung, Laufzeit, Wert, alle Labels und
-  einen Runbook-Link. Ohne erreichbares Prometheus blendet sich alles aus.
-- **QR-Onboarding**: Kubeconfig als QR-Code scannen
+- **Related resources**: the detail view links owners (ownerReferences)
+  and children (Deployment → ReplicaSets/Pods, Service → Pods, Ingress →
+  Services, PVC ↔ Volume/Pods, Pod → Node/PVCs) for easy navigation.
+- **Favorites/pins**: any resource can be pinned in the detail view via the
+  star; the home screen shows a "Pinned" section with all
+  pinned objects **across all clusters** — one tap jumps straight
+  to the resource, a long press removes the pin. Stored in the Keychain
+  (expo-secure-store) so the pins survive an app restart.
+- **Multi-cluster dashboard**: the home screen checks all clusters in parallel
+  (node readiness, problem pods) and shows traffic-light status plus a short
+  summary per cluster.
+- **Home screen widget** (WidgetKit): small/medium widget with the
+  health status of all clusters (traffic light per cluster, "x/y clusters healthy").
+  On every health check the app writes a snapshot to the App Group
+  (`group.at.pfaffenbauer.captain`) and triggers the widget reload; the
+  widget therefore shows the state from the last app launch.
+- **Background alerts** (optional): a BGTaskScheduler task checks the
+  clusters periodically in the background, updates the widget, and reports
+  degradations via local notification (deduplicated; iOS schedules the
+  runs opportunistically — best effort, not a monitoring replacement).
+- **Interactive terminal**: in addition to one-shot commands there is an
+  interactive mode — a persistent `kubectl exec -it` session (PTY,
+  stdin over the open WebSocket, ANSI sequences are filtered).
+- **Live Activity** (iOS 16.2+): active port forwards appear as a
+  Live Activity on the lock screen and in the Dynamic Island.
+- **Siri / Shortcuts** (App Intents): "Check cluster health" lets Siri answer
+  headlessly from the latest health snapshot; "Open Cluster" (iOS 18+)
+  opens a cluster via deep link (`captain://open?cluster=<name>`).
+- **iPad split view**: from 768 pt width the resource list shows the list on
+  the left and an inspector (summary, events, YAML) for the selected
+  object on the right; Browse and Home content is centered and width-limited.
+- **Face ID app lock** (optional): hides the app contents on cold start and
+  when returning from the background until Face ID/Touch ID or the device
+  passcode has been confirmed.
+- **Auth for cloud providers**:
+  - **AWS EKS**: SigV4-presigned STS token (`k8s-aws-v1.…`), equivalent to
+    `aws eks get-token` — entirely on-device, no CLI needed.
+  - **Google GKE**: OAuth 2.0 (PKCE) with refresh token.
+  - **Azure AKS**: Microsoft Entra ID OAuth 2.0 (PKCE) against the
+    AKS AAD server app.
+  - **Generic OIDC** (Keycloak, Dex, Authentik …): authorization code +
+    PKCE against the issuer's discovery document; the ID token is sent as a
+    bearer token and refreshed automatically.
+  - **Bearer token**: e.g. ServiceAccount tokens.
+  - **Client certificates (mTLS)**: PEM certificate + key straight from the
+    kubeconfig (RSA and EC), natively via URLSession; alternatively PKCS#12.
+- **Kubeconfig import**: paste YAML, pick contexts, done. Exec plugins
+  (`aws`, `gke-gcloud-auth-plugin`, `kubelogin`) are detected and mapped to the
+  matching native auth method.
+- **Custom cluster CAs**: the native `KubeHttp` module validates the
+  server certificates against the CA stored in the kubeconfig
+  (`certificate-authority-data`) — necessary because EKS/GKE/AKS endpoints are
+  signed by cluster-specific CAs.
+- **Exec terminal**: one-shot commands via the `kubectl exec` WebSocket
+  (`v4.channel.k8s.io`), natively with cluster-CA trust — including quick-command
+  chips in the terminal UI.
+- **Port forwarding**: a local TCP listener (Network.framework) bridges to
+  the `portforward` WebSocket endpoint; active forwards appear in the
+  Browse tab under Network and can be stopped individually.
+- **Live metrics**: node and pod usage via the metrics-server API
+  (`metrics.k8s.io`) — CPU/memory bars in the node list, CPU column in
+  the pod list; without metrics-server this hides itself automatically.
+- **Prometheus integration**: Captain finds Prometheus in the cluster
+  automatically (well-known service names/labels) and queries it **through the
+  API server proxy** — no extra network or auth configuration needed, the
+  existing cluster connection (CA trust, token, mTLS) is enough. The dashboard
+  shows CPU/memory trends for the last hour as sparklines as well as the
+  currently **firing alerts** (sorted by severity, pod alerts open the resource
+  directly). "View all" opens a dedicated alerts page with a severity filter;
+  tapping an alert shows the description, duration, value, all labels, and
+  a runbook link. Without a reachable Prometheus, all of this hides itself.
+- **QR onboarding**: scan a kubeconfig as a QR code
   (`kubectl config view --minify --raw | qrencode -t png`).
-- **Settings-Sheet**: Default-Namespace, Haptics-Toggle (echtes Tap-Feedback
-  bei destruktiven Aktionen), Cluster bearbeiten, Sign-out aus allen Clustern.
+- **Settings sheet**: default namespace, haptics toggle (real tap feedback
+  on destructive actions), edit clusters, sign out of all clusters.
 
-## Projektstruktur
+## Project structure
 
 ```
 app/                          Screens (expo-router)
-  index.tsx                   Cluster-Übersicht
-  cluster-form.tsx            Cluster anlegen/bearbeiten inkl. Cloud-Auth
-  kubeconfig-import.tsx       Kubeconfig-Import
-  cluster/[id]/index.tsx      Ressourcen-Typen (Discovery, gruppiert, Suche)
-  cluster/[id]/list.tsx       Ressourcen-Liste (Namespace, Pagination, Suche)
-  cluster/[id]/item.tsx       YAML-Detail, Editor, Löschen
-  cluster/[id]/helm.tsx       Helm-Releases (Liste + Detail in helm-release.tsx)
-  cluster/[id]/gitops.tsx     Argo-CD-/Flux-Sync-Status
+  index.tsx                   Cluster overview
+  cluster-form.tsx            Create/edit clusters incl. cloud auth
+  kubeconfig-import.tsx       Kubeconfig import
+  cluster/[id]/index.tsx      Resource types (discovery, grouped, search)
+  cluster/[id]/list.tsx       Resource list (namespace, pagination, search)
+  cluster/[id]/item.tsx       YAML detail, editor, delete
+  cluster/[id]/helm.tsx       Helm releases (list + detail in helm-release.tsx)
+  cluster/[id]/gitops.tsx     Argo CD / Flux sync status
 src/
-  auth/                       EKS-SigV4, Google/Azure-OAuth, generisches OIDC,
-                              Token-Cache
-  kube/                       Transport, Discovery, CRUD, Kubeconfig-Parser,
-                              stream.ts (Log-Follow), watch.ts (Live-Listen),
+  auth/                       EKS SigV4, Google/Azure OAuth, generic OIDC,
+                              token cache
+  kube/                       Transport, discovery, CRUD, kubeconfig parser,
+                              stream.ts (log follow), watch.ts (live lists),
                               helm.ts, gitops.ts, related.ts, health.ts,
                               metrics-server + Prometheus (prometheus.ts)
   state/, storage/, ui/, util/
-modules/kube-http/            Natives iOS-Modul (Swift): TLS mit eigener CA,
-                              insecure-skip-verify, mTLS via PEM oder PKCS#12
+modules/kube-http/            Native iOS module (Swift): TLS with custom CA,
+                              insecure-skip-verify, mTLS via PEM or PKCS#12
 ```
 
 ## Setup
 
-Voraussetzungen: macOS mit Xcode 16+, Node 20+, CocoaPods.
+Prerequisites: macOS with Xcode 16+, Node 20+, CocoaPods.
 
 ```sh
 npm install
-npx expo run:ios          # erstellt den iOS-Build inkl. nativem KubeHttp-Modul
+npx expo run:ios          # creates the iOS build incl. the native KubeHttp module
 ```
 
-> **Wichtig:** Für eigene Cluster-CAs und Client-Zertifikate ist ein
-> Development-Build nötig (`npx expo run:ios`). In **Expo Go** fällt Captain auf
-> `fetch()` zurück — das funktioniert nur bei API-Servern mit öffentlich
-> vertrauenswürdigem Zertifikat.
+> **Important:** custom cluster CAs and client certificates require a
+> development build (`npx expo run:ios`). In **Expo Go**, Captain falls back to
+> `fetch()` — that only works with API servers using a publicly trusted
+> certificate.
 
-Für ein Gerät statt Simulator: in Xcode Signing-Team setzen oder
+For a device instead of the simulator: set a signing team in Xcode or run
 `npx expo run:ios --device`.
 
-> **Widget:** Die Widget-Extension (`targets/widget`) wird beim Prebuild von
-> `@bacons/apple-targets` als eigenes Target erzeugt. Fürs Gerät braucht die
-> Extension ein Signing-Team — entweder in Xcode setzen oder in `app.json`
-> dem Plugin mitgeben: `["@bacons/apple-targets", { "appleTeamId": "ABCDE12345" }]`.
-> App und Widget teilen sich die App Group `group.at.pfaffenbauer.captain`.
+> **Widget:** the widget extension (`targets/widget`) is generated as its own
+> target during prebuild by `@bacons/apple-targets`. For a device, the
+> extension needs a signing team — either set it in Xcode or pass it to the
+> plugin in `app.json`: `["@bacons/apple-targets", { "appleTeamId": "ABCDE12345" }]`.
+> App and widget share the App Group `group.at.pfaffenbauer.captain`.
 
-## Authentifizierung einrichten
+## Setting up authentication
 
-### Bearer-Token (jeder Cluster)
+### Bearer token (any cluster)
 
 ```sh
 kubectl create serviceaccount captain -n kube-system
@@ -179,87 +178,88 @@ kubectl create clusterrolebinding captain --clusterrole=cluster-admin --servicea
 kubectl create token captain -n kube-system --duration=8760h
 ```
 
-Token im Formular einfügen. CA aus der Kubeconfig
-(`certificate-authority-data`) ins CA-Feld kopieren.
+Paste the token into the form. Copy the CA from the kubeconfig
+(`certificate-authority-data`) into the CA field.
 
 ### AWS EKS
 
-1. IAM-User/Role mit Zugriff auf den Cluster (Access Entries oder
-   `aws-auth`-ConfigMap).
-2. Im Formular: Region, EKS-Cluster-Name, Access Key ID, Secret Access Key
-   (optional Session Token für temporäre STS-Credentials).
-3. Server-URL und CA aus `aws eks describe-cluster --name <cluster>`
+1. IAM user/role with access to the cluster (access entries or the
+   `aws-auth` ConfigMap).
+2. In the form: region, EKS cluster name, access key ID, secret access key
+   (optionally a session token for temporary STS credentials).
+3. Server URL and CA from `aws eks describe-cluster --name <cluster>`
    (`cluster.endpoint`, `cluster.certificateAuthority.data`).
 
-Captain erzeugt das Token on-device per SigV4 (presigned
-`sts:GetCallerIdentity` mit `x-k8s-aws-id`-Header) und erneuert es automatisch.
+Captain generates the token on-device via SigV4 (presigned
+`sts:GetCallerIdentity` with the `x-k8s-aws-id` header) and refreshes it
+automatically.
 
 ### Google GKE
 
-1. In der Google Cloud Console einen **OAuth-Client vom Typ iOS** anlegen
-   (Bundle-ID: `at.pfaffenbauer.captain`).
-2. Client-ID im Formular eintragen und „Mit Google anmelden".
-3. Der Google-Account braucht z. B. `roles/container.developer`.
-4. Server-URL und CA: `gcloud container clusters describe <cluster>`
+1. In the Google Cloud Console, create an **OAuth client of type iOS**
+   (bundle ID: `at.pfaffenbauer.captain`).
+2. Enter the client ID in the form and tap "Sign in with Google".
+3. The Google account needs e.g. `roles/container.developer`.
+4. Server URL and CA: `gcloud container clusters describe <cluster>`
    (`endpoint`, `masterAuth.clusterCaCertificate`).
 
-Scope: `cloud-platform`; Refresh-Tokens werden gespeichert und automatisch
-erneuert.
+Scope: `cloud-platform`; refresh tokens are stored and renewed
+automatically.
 
 ### Azure AKS
 
-Voraussetzung: AKS-Cluster mit Entra-ID-Integration (managed AAD).
+Prerequisite: AKS cluster with Entra ID integration (managed AAD).
 
-1. App-Registrierung in Entra ID anlegen (Typ „Public client/native"),
-   Redirect-URI: `captain://oauth`.
-2. Der App-Registrierung die API-Berechtigung **Azure Kubernetes Service AAD
-   Server** (`6dae42f8-4368-4678-94ff-3960e28e3630/user.read`) gewähren.
-3. Im Formular Tenant-ID und Client-ID eintragen, „Mit Microsoft anmelden".
-4. Der Benutzer braucht passende Kubernetes-RBAC-/Azure-RBAC-Rollen
-   (z. B. „Azure Kubernetes Service RBAC Reader/Writer").
+1. Create an app registration in Entra ID (type "Public client/native"),
+   redirect URI: `captain://oauth`.
+2. Grant the app registration the API permission **Azure Kubernetes Service AAD
+   Server** (`6dae42f8-4368-4678-94ff-3960e28e3630/user.read`).
+3. Enter the tenant ID and client ID in the form, tap "Sign in with Microsoft".
+4. The user needs appropriate Kubernetes RBAC / Azure RBAC roles
+   (e.g. "Azure Kubernetes Service RBAC Reader/Writer").
 
-### Generisches OIDC (Keycloak, Dex, Authentik …)
+### Generic OIDC (Keycloak, Dex, Authentik …)
 
-Voraussetzung: API-Server mit OIDC-Flags (`--oidc-issuer-url`,
-`--oidc-client-id`, ggf. `--oidc-username-claim`/`--oidc-groups-claim`).
+Prerequisite: API server with OIDC flags (`--oidc-issuer-url`,
+`--oidc-client-id`, optionally `--oidc-username-claim`/`--oidc-groups-claim`).
 
-1. Beim Provider einen **public client** mit Redirect-URI `captain://oauth`
-   anlegen (PKCE; ein Client-Secret ist nur für confidential clients nötig).
-2. Im Formular Issuer-URL und Client-ID eintragen, optional zusätzliche
-   Scopes (z. B. `groups`), dann „Beim Provider anmelden".
-3. Captain sendet das **ID-Token** als Bearer und erneuert es über das
-   Refresh-Token.
+1. Create a **public client** with redirect URI `captain://oauth` at the
+   provider (PKCE; a client secret is only needed for confidential clients).
+2. Enter the issuer URL and client ID in the form, optionally additional
+   scopes (e.g. `groups`), then tap "Sign in with provider".
+3. Captain sends the **ID token** as a bearer token and renews it via the
+   refresh token.
 
-### Client-Zertifikate (mTLS)
+### Client certificates (mTLS)
 
-`client-certificate-data` und `client-key-data` aus der Kubeconfig direkt in
-die Formularfelder einfügen (base64 oder PEM) — der Kubeconfig-Import
-übernimmt beides automatisch. Unterstützt werden RSA- und EC-Keys
-(PKCS#1, SEC1, unverschlüsseltes PKCS#8).
+Paste `client-certificate-data` and `client-key-data` from the kubeconfig
+directly into the form fields (base64 or PEM) — the kubeconfig import
+picks up both automatically. RSA and EC keys are supported
+(PKCS#1, SEC1, unencrypted PKCS#8).
 
-Alternativ kann weiterhin ein PKCS#12-Bundle hinterlegt werden:
+Alternatively, a PKCS#12 bundle can still be provided:
 
 ```sh
 openssl pkcs12 -export -in client.crt -inkey client.key -out client.p12 -password pass:captain
 base64 -i client.p12 | pbcopy
 ```
 
-## Sicherheit
+## Security
 
-- Alle Zugangsdaten liegen ausschließlich im iOS-Keychain des Geräts.
-- TLS-Validierung gegen die Cluster-CA per nativem URLSession-Delegate;
-  „TLS überspringen" ist möglich, aber als unsicher markiert.
-- Es gibt kein Backend — die App spricht direkt mit dem API-Server.
+- All credentials live exclusively in the device's iOS Keychain.
+- TLS validation against the cluster CA via a native URLSession delegate;
+  "skip TLS" is possible but marked as insecure.
+- There is no backend — the app talks directly to the API server.
 
-## Bekannte Grenzen
+## Known limitations
 
-- Kubeconfig-`exec`-Plugins können nicht ausgeführt werden (kein Subprozess auf
-  iOS); der Import mappt sie auf die nativen Auth-Methoden (`aws`,
-  `gke-gcloud-auth-plugin`, `kubelogin`, `oidc-login` → OIDC) und markiert
-  fehlende Felder.
-- Das interaktive Terminal ist ein einfaches PTY ohne vollwertige
-  ANSI-Emulation (kein vim/top); Escape-Sequenzen werden entfernt.
-- Helm- und GitOps-Ansichten sind lesend (plus Sync-Trigger); Upgrade/
-  Rollback/Uninstall von Releases bleibt dem CLI überlassen.
-- In Expo Go (ohne natives Modul) gibt es kein Log-Streaming und keine
-  Live-Listen; Follow fällt auf Polling zurück.
+- Kubeconfig `exec` plugins cannot be executed (no subprocess on
+  iOS); the import maps them to the native auth methods (`aws`,
+  `gke-gcloud-auth-plugin`, `kubelogin`, `oidc-login` → OIDC) and flags
+  missing fields.
+- The interactive terminal is a simple PTY without full
+  ANSI emulation (no vim/top); escape sequences are stripped.
+- Helm and GitOps views are read-only (plus sync triggers); upgrading/
+  rolling back/uninstalling releases is left to the CLI.
+- In Expo Go (without the native module) there is no log streaming and no
+  live lists; follow falls back to polling.
