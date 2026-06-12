@@ -374,7 +374,10 @@ struct KubeTlsOptions {
   let pkcs12Password: String?
 }
 
-func kubeMakeSession(tls: KubeTlsOptions, timeout: Double) throws -> URLSession {
+/// Resolves TLS options into a trust delegate (CA anchors, client identity,
+/// client cert chain). Shared by the HTTP, exec, and port-forward paths so all
+/// of them support PEM cert/key and PKCS#12 client certificates identically.
+func kubeMakeTrustDelegate(tls: KubeTlsOptions) throws -> KubeTrustDelegate {
   var identity: SecIdentity?
   var clientChain: [SecCertificate] = []
   if let certPem = tls.clientCertPem, !certPem.isEmpty,
@@ -395,7 +398,11 @@ func kubeMakeSession(tls: KubeTlsOptions, timeout: Double) throws -> URLSession 
       throw NSError(domain: "KubeHttp", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not parse any certificate from the provided CA PEM data"])
     }
   }
-  let delegate = KubeTrustDelegate(anchors: anchors, insecure: tls.insecure, identity: identity, clientChain: clientChain)
+  return KubeTrustDelegate(anchors: anchors, insecure: tls.insecure, identity: identity, clientChain: clientChain)
+}
+
+func kubeMakeSession(tls: KubeTlsOptions, timeout: Double) throws -> URLSession {
+  let delegate = try kubeMakeTrustDelegate(tls: tls)
   let configuration = URLSessionConfiguration.ephemeral
   configuration.timeoutIntervalForRequest = timeout
   return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
@@ -419,27 +426,39 @@ func kubeDescribeFailure(_ error: Error, session: URLSession) -> String {
 
 // MARK: - Exec session (one-shot command over the v4 channel protocol)
 
-final class KubeExecRunner {
-  private let task: URLSessionWebSocketTask
-  private let session: URLSession
+/// Drives a single `kubectl exec` WebSocket. Completion is detected via the
+/// WebSocket delegate (clean close or upgrade error) rather than relying on
+/// the `receive` callback alone, which does not reliably fire on a server
+/// close — that was the cause of the terminal hanging on "Running…".
+final class KubeExecRunner: NSObject, URLSessionWebSocketDelegate {
+  private let trust: KubeTrustDelegate
+  private let request: URLRequest
+  private let promise: Promise
+
+  private var session: URLSession!
+  private var task: URLSessionWebSocketTask!
   private var stdout = Data()
   private var stderr = Data()
   private var errorJson = Data()
   private var finished = false
-  private let promise: Promise
   private let queue = DispatchQueue(label: "kube.exec")
 
-  init(session: URLSession, request: URLRequest, promise: Promise) {
-    self.session = session
-    self.task = session.webSocketTask(with: request)
+  init(request: URLRequest, trust: KubeTrustDelegate, promise: Promise) {
+    self.request = request
+    self.trust = trust
     self.promise = promise
+    super.init()
   }
 
   func start(timeoutMs: Double) {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = timeoutMs / 1000.0
+    session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+    task = session.webSocketTask(with: request)
     task.resume()
     receive()
     queue.asyncAfter(deadline: .now() + timeoutMs / 1000.0) { [weak self] in
-      self?.finish(timedOut: true)
+      self?.finish(timedOut: true, failure: nil)
     }
   }
 
@@ -448,7 +467,8 @@ final class KubeExecRunner {
       guard let self = self else { return }
       switch result {
       case .failure:
-        self.finish(timedOut: false)
+        // Socket closed/errored — finalization handled by the delegate methods.
+        return
       case .success(let message):
         var data: Data
         switch message {
@@ -473,19 +493,56 @@ final class KubeExecRunner {
     }
   }
 
-  private func finish(timedOut: Bool) {
+  private func finish(timedOut: Bool, failure: String?) {
     queue.async {
       if self.finished { return }
       self.finished = true
       self.task.cancel(with: .normalClosure, reason: nil)
       self.session.finishTasksAndInvalidate()
+      var errorString = String(data: self.errorJson, encoding: .utf8) ?? ""
+      if errorString.isEmpty, let failure = failure { errorString = failure }
       self.promise.resolve([
         "stdout": String(data: self.stdout, encoding: .utf8) ?? "",
         "stderr": String(data: self.stderr, encoding: .utf8) ?? "",
-        "error": String(data: self.errorJson, encoding: .utf8) ?? "",
+        "error": errorString,
         "timedOut": timedOut,
       ])
     }
+  }
+
+  // MARK: URLSession delegates
+
+  func urlSession(
+    _ session: URLSession,
+    didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+  ) {
+    trust.urlSession(session, didReceive: challenge, completionHandler: completionHandler)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    webSocketTask: URLSessionWebSocketTask,
+    didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
+    reason: Data?
+  ) {
+    // Give any in-flight frames a moment to land, then resolve.
+    queue.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+      self?.finish(timedOut: false, failure: nil)
+    }
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    var failure: String? = nil
+    if let reason = trust.trustFailureReason {
+      failure = reason
+    } else if let http = task.response as? HTTPURLResponse, http.statusCode >= 400 {
+      failure = "HTTP \(http.statusCode) — the API server rejected the exec request (RBAC: pods/exec?)."
+    } else if let error = error as NSError?, error.code != NSURLErrorCancelled {
+      let hint = trust.clientCertHint.map { " (\($0))" } ?? ""
+      failure = error.localizedDescription + hint
+    }
+    finish(timedOut: false, failure: failure)
   }
 }
 
@@ -679,20 +736,18 @@ public class KubeHttpModule: Module {
         promise.reject("ERR_KUBE_URL", "Invalid URL: \(options.url)")
         return
       }
-      let session: URLSession
+      let trust: KubeTrustDelegate
       do {
-        session = try kubeMakeSession(
-          tls: KubeTlsOptions(
-            caPem: options.caPem, insecure: options.insecure,
-            clientCertPem: options.clientCertPem, clientKeyPem: options.clientKeyPem,
-            pkcs12: options.pkcs12, pkcs12Password: options.pkcs12Password
-          ),
-          timeout: options.timeoutMs / 1000.0
-        )
+        trust = try kubeMakeTrustDelegate(tls: KubeTlsOptions(
+          caPem: options.caPem, insecure: options.insecure,
+          clientCertPem: options.clientCertPem, clientKeyPem: options.clientKeyPem,
+          pkcs12: options.pkcs12, pkcs12Password: options.pkcs12Password
+        ))
       } catch {
         promise.reject("ERR_KUBE_TLS", error.localizedDescription)
         return
       }
+
       var request = URLRequest(url: url)
       request.timeoutInterval = options.timeoutMs / 1000.0
       for (key, value) in options.headers {
@@ -700,7 +755,7 @@ public class KubeHttpModule: Module {
       }
       request.setValue("v4.channel.k8s.io", forHTTPHeaderField: "Sec-WebSocket-Protocol")
 
-      let runner = KubeExecRunner(session: session, request: request, promise: promise)
+      let runner = KubeExecRunner(request: request, trust: trust, promise: promise)
       runner.start(timeoutMs: options.timeoutMs)
     }
 
