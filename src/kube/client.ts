@@ -1,4 +1,5 @@
 import { ApiResourceType, ClusterConfig, KubeList, KubeListItem } from '../types';
+import { kubeStream, KubeStreamHandle, KubeStreamHandlers } from './stream';
 import { kubeRequest, kubeRequestJson } from './transport';
 
 interface ApiGroupList {
@@ -394,6 +395,28 @@ export async function getPodLogs(
   return kubeRequest(
     cluster,
     `/api/v1/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(name)}/log?${params.toString()}`
+  );
+}
+
+/**
+ * Streams pod logs live (`kubectl logs -f`) via the native streaming transport.
+ * Chunks arrive as they are written; stop the handle to end the stream.
+ */
+export async function streamPodLogs(
+  cluster: ClusterConfig,
+  namespace: string,
+  name: string,
+  options: { container?: string; tailLines?: number },
+  handlers: KubeStreamHandlers
+): Promise<KubeStreamHandle> {
+  const params = new URLSearchParams();
+  params.set('follow', 'true');
+  params.set('tailLines', String(options.tailLines ?? 500));
+  if (options.container) params.set('container', options.container);
+  return kubeStream(
+    cluster,
+    `/api/v1/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(name)}/log?${params.toString()}`,
+    handlers
   );
 }
 

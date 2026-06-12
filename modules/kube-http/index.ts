@@ -55,11 +55,40 @@ export interface NativePortForwardHandle {
   localPort: number;
 }
 
+export interface NativeStreamOptions extends TlsOptions {
+  url: string;
+  method?: string;
+  headers: Record<string, string>;
+  body?: string;
+  /** Max. idle time between two received chunks; 0 = one hour (log follow / watch). */
+  idleTimeoutMs?: number;
+}
+
+export interface NativeStreamHandlers {
+  onChunk: (data: string) => void;
+  /** Called exactly once when the stream ends; `error` is undefined on a clean close. */
+  onEnd: (error?: string) => void;
+}
+
+interface KubeStreamChunkEvent {
+  id: string;
+  data: string;
+}
+
+interface KubeStreamEndEvent {
+  id: string;
+  error: string;
+  status: number;
+}
+
 interface KubeHttpNativeModule {
   request(options: NativeRequestOptions): Promise<NativeResponse>;
   exec(options: NativeExecOptions): Promise<NativeExecResult>;
+  streamStart(options: NativeStreamOptions): Promise<string>;
+  streamStop(id: string): void;
   portForwardStart(options: NativePortForwardOptions): Promise<NativePortForwardHandle>;
   portForwardStop(id: string): void;
+  addListener<T>(eventName: string, listener: (event: T) => void): { remove(): void };
 }
 
 const native = requireOptionalNativeModule<KubeHttpNativeModule>('KubeHttp');
@@ -86,6 +115,74 @@ export async function nativeRequest(options: NativeRequestOptions): Promise<Nati
 
 export async function nativeExec(options: NativeExecOptions): Promise<NativeExecResult> {
   return requireNative().exec(options);
+}
+
+export interface NativeStreamHandle {
+  id: string;
+  stop(): void;
+}
+
+const streamHandlers = new Map<string, NativeStreamHandlers>();
+/** Events that arrived before streamStart() resolved and the handler was registered. */
+const earlyStreamEvents = new Map<string, { chunks: string[]; end?: string | null }>();
+let streamListenersAttached = false;
+
+function attachStreamListeners(module: KubeHttpNativeModule) {
+  if (streamListenersAttached) return;
+  streamListenersAttached = true;
+  module.addListener<KubeStreamChunkEvent>('kubeStreamChunk', (event) => {
+    const handlers = streamHandlers.get(event.id);
+    if (handlers) {
+      handlers.onChunk(event.data);
+      return;
+    }
+    const early = earlyStreamEvents.get(event.id) ?? { chunks: [] };
+    early.chunks.push(event.data);
+    earlyStreamEvents.set(event.id, early);
+  });
+  module.addListener<KubeStreamEndEvent>('kubeStreamEnd', (event) => {
+    const handlers = streamHandlers.get(event.id);
+    if (handlers) {
+      streamHandlers.delete(event.id);
+      handlers.onEnd(event.error || undefined);
+      return;
+    }
+    const early = earlyStreamEvents.get(event.id) ?? { chunks: [] };
+    early.end = event.error || null;
+    earlyStreamEvents.set(event.id, early);
+  });
+}
+
+/**
+ * Opens a streaming HTTP request (log follow, watch API). Chunks are delivered
+ * as they arrive; stopping the handle ends the stream without an error.
+ */
+export async function nativeStreamStart(
+  options: NativeStreamOptions,
+  handlers: NativeStreamHandlers
+): Promise<NativeStreamHandle> {
+  const module = requireNative();
+  attachStreamListeners(module);
+  const id = await module.streamStart(options);
+  streamHandlers.set(id, handlers);
+  const early = earlyStreamEvents.get(id);
+  if (early) {
+    earlyStreamEvents.delete(id);
+    for (const chunk of early.chunks) handlers.onChunk(chunk);
+    if (early.end !== undefined) {
+      streamHandlers.delete(id);
+      handlers.onEnd(early.end ?? undefined);
+    }
+  }
+  return {
+    id,
+    stop() {
+      // Detach first: the cancellation still fires kubeStreamEnd natively,
+      // but a deliberate stop should not invoke onEnd.
+      streamHandlers.delete(id);
+      module.streamStop(id);
+    },
+  };
 }
 
 export async function nativePortForwardStart(

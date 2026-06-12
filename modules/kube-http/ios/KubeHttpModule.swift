@@ -37,6 +37,21 @@ struct KubeExecOptions: Record {
   @Field var timeoutMs: Double = 20000
 }
 
+struct KubeStreamOptions: Record {
+  @Field var url: String = ""
+  @Field var method: String = "GET"
+  @Field var headers: [String: String] = [:]
+  @Field var body: String? = nil
+  @Field var caPem: String? = nil
+  @Field var insecure: Bool = false
+  @Field var clientCertPem: String? = nil
+  @Field var clientKeyPem: String? = nil
+  @Field var pkcs12: String? = nil
+  @Field var pkcs12Password: String? = nil
+  // Max. idle time between two received chunks; 0 = one hour (log follow / watch).
+  @Field var idleTimeoutMs: Double = 0
+}
+
 struct KubePortForwardOptions: Record {
   // wss:// URL of the portforward endpoint including ?ports=<remote>
   @Field var url: String = ""
@@ -546,6 +561,132 @@ final class KubeExecRunner: NSObject, URLSessionWebSocketDelegate {
   }
 }
 
+// MARK: - Streaming request session (log follow, watch)
+
+/// Long-lived HTTP request that surfaces response chunks as they arrive.
+/// Used for `kubectl logs -f` style streams and the watch API.
+final class KubeStreamSession: NSObject, URLSessionDataDelegate {
+  let id: String
+  private let trust: KubeTrustDelegate
+  private let onChunk: (String) -> Void
+  private let onEnd: (String?, Int) -> Void
+
+  private var session: URLSession!
+  private var task: URLSessionDataTask!
+  private var status = 0
+  private var errorBody = Data()
+  /// Bytes held back because they end mid-way through a UTF-8 sequence.
+  private var pending = Data()
+  private var finished = false
+  private let queue = DispatchQueue(label: "kube.stream")
+
+  init(
+    id: String,
+    request: URLRequest,
+    trust: KubeTrustDelegate,
+    idleTimeout: Double,
+    onChunk: @escaping (String) -> Void,
+    onEnd: @escaping (String?, Int) -> Void
+  ) {
+    self.id = id
+    self.trust = trust
+    self.onChunk = onChunk
+    self.onEnd = onEnd
+    super.init()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = idleTimeout
+    configuration.timeoutIntervalForResource = 60 * 60 * 24
+    session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+    task = session.dataTask(with: request)
+  }
+
+  func start() {
+    task.resume()
+  }
+
+  func stop() {
+    task.cancel()
+  }
+
+  /// Decodes as much of the buffered data as forms complete UTF-8 sequences,
+  /// keeping a partial trailing character for the next chunk.
+  private func drainPending() -> String? {
+    var keep = 0
+    // A UTF-8 sequence is at most 4 bytes; check whether the buffer ends inside one.
+    let bytes = [UInt8](pending)
+    var index = bytes.count - 1
+    while index >= 0 && keep < 3 {
+      let byte = bytes[index]
+      if byte & 0x80 == 0 { break } // ASCII tail, nothing partial
+      if byte & 0xC0 == 0xC0 {
+        // Leading byte: partial if the sequence it starts is longer than what follows.
+        let needed = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : 2
+        if bytes.count - index < needed { keep = bytes.count - index }
+        break
+      }
+      index -= 1
+      keep += 1
+    }
+    if keep >= bytes.count { return nil }
+    let complete = pending.prefix(pending.count - keep)
+    pending = pending.suffix(keep)
+    guard !complete.isEmpty else { return nil }
+    return String(data: complete, encoding: .utf8)
+  }
+
+  // MARK: URLSession delegates
+
+  func urlSession(
+    _ session: URLSession,
+    didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+  ) {
+    trust.urlSession(session, didReceive: challenge, completionHandler: completionHandler)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    dataTask: URLSessionDataTask,
+    didReceive response: URLResponse,
+    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+  ) {
+    status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    completionHandler(.allow)
+  }
+
+  func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    queue.async {
+      if self.status >= 400 {
+        self.errorBody.append(data)
+        return
+      }
+      self.pending.append(data)
+      if let text = self.drainPending(), !text.isEmpty {
+        self.onChunk(text)
+      }
+    }
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    queue.async {
+      if self.finished { return }
+      self.finished = true
+      var failure: String?
+      if self.status >= 400 {
+        let body = String(data: self.errorBody, encoding: .utf8) ?? ""
+        failure = "HTTP \(self.status)\(body.isEmpty ? "" : ": \(body.prefix(300))")"
+      } else if let reason = self.trust.trustFailureReason {
+        failure = reason
+      } else if let error = error as NSError?, error.code != NSURLErrorCancelled {
+        let hint = self.trust.clientCertHint.map { " (\($0))" } ?? ""
+        failure = error.localizedDescription + hint
+      }
+      self.onEnd(failure, self.status)
+      session.finishTasksAndInvalidate()
+    }
+  }
+}
+
 // MARK: - Port forward session
 
 final class KubePortForwardSession {
@@ -671,9 +812,12 @@ final class KubePortForwardSession {
 
 public class KubeHttpModule: Module {
   private var forwards: [String: KubePortForwardSession] = [:]
+  private var streams: [String: KubeStreamSession] = [:]
 
   public func definition() -> ModuleDefinition {
     Name("KubeHttp")
+
+    Events("kubeStreamChunk", "kubeStreamEnd")
 
     AsyncFunction("request") { (options: KubeRequestOptions, promise: Promise) in
       guard let url = URL(string: options.url) else {
@@ -759,6 +903,57 @@ public class KubeHttpModule: Module {
       runner.start(timeoutMs: options.timeoutMs)
     }
 
+    AsyncFunction("streamStart") { (options: KubeStreamOptions, promise: Promise) in
+      guard let url = URL(string: options.url) else {
+        promise.reject("ERR_KUBE_URL", "Invalid URL: \(options.url)")
+        return
+      }
+      let trust: KubeTrustDelegate
+      do {
+        trust = try kubeMakeTrustDelegate(tls: KubeTlsOptions(
+          caPem: options.caPem, insecure: options.insecure,
+          clientCertPem: options.clientCertPem, clientKeyPem: options.clientKeyPem,
+          pkcs12: options.pkcs12, pkcs12Password: options.pkcs12Password
+        ))
+      } catch {
+        promise.reject("ERR_KUBE_TLS", error.localizedDescription)
+        return
+      }
+
+      var request = URLRequest(url: url)
+      request.httpMethod = options.method
+      for (key, value) in options.headers {
+        request.setValue(value, forHTTPHeaderField: key)
+      }
+      if let body = options.body {
+        request.httpBody = body.data(using: .utf8)
+      }
+
+      let id = UUID().uuidString
+      let idleTimeout = options.idleTimeoutMs > 0 ? options.idleTimeoutMs / 1000.0 : 3600
+      let stream = KubeStreamSession(
+        id: id,
+        request: request,
+        trust: trust,
+        idleTimeout: idleTimeout,
+        onChunk: { [weak self] data in
+          self?.sendEvent("kubeStreamChunk", ["id": id, "data": data])
+        },
+        onEnd: { [weak self] failure, status in
+          self?.streams.removeValue(forKey: id)
+          self?.sendEvent("kubeStreamEnd", ["id": id, "error": failure ?? "", "status": status])
+        }
+      )
+      streams[id] = stream
+      stream.start()
+      promise.resolve(id)
+    }
+
+    Function("streamStop") { (id: String) in
+      self.streams[id]?.stop()
+      self.streams.removeValue(forKey: id)
+    }
+
     AsyncFunction("portForwardStart") { (options: KubePortForwardOptions, promise: Promise) in
       guard let url = URL(string: options.url) else {
         promise.reject("ERR_KUBE_URL", "Invalid URL: \(options.url)")
@@ -826,6 +1021,10 @@ public class KubeHttpModule: Module {
         forward.stop()
       }
       self.forwards.removeAll()
+      for (_, stream) in self.streams {
+        stream.stop()
+      }
+      self.streams.removeAll()
     }
   }
 }
