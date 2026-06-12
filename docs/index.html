@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Captain ⎈ — A Kubernetes Client for iOS</title>
+<meta name="description" content="Captain is a Kubernetes client for iOS that dynamically discovers every resource type in your cluster — including CRDs — with native auth for EKS, GKE and AKS, exec, port-forwarding, live metrics and Prometheus integration.">
+<meta property="og:title" content="Captain ⎈ — A Kubernetes Client for iOS">
+<meta property="og:description" content="Browse, edit and delete any Kubernetes resource from your iPhone. Native cloud auth, exec terminal, port-forwarding, live metrics and Prometheus — no backend, your credentials never leave the device.">
+<meta property="og:image" content="icon.png">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  :root {
+    --bg: #0d1024;
+    --bg-2: #131736;
+    --card: #1a1f42;
+    --card-border: #2a3060;
+    --text: #e8eaf6;
+    --muted: #9aa1c9;
+    --accent: #6c8cff;
+    --accent-2: #8a6cff;
+    --gold: #e0a82e;
+    --green: #4ade80;
+    --radius: 20px;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* Nav */
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: blur(14px);
+    background: rgba(13, 16, 36, 0.8);
+    border-bottom: 1px solid rgba(42, 48, 96, 0.5);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
+  nav img { width: 32px; height: 32px; border-radius: 8px; }
+  nav .brand { font-weight: 700; font-size: 17px; letter-spacing: 0.2px; }
+  nav .links { margin-left: auto; display: flex; gap: 22px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .15s; }
+  nav a:hover { color: var(--text); }
+
+  /* Hero */
+  header {
+    position: relative;
+    overflow: hidden;
+    padding: 96px 0 80px;
+    text-align: center;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% -10%, rgba(108, 140, 255, 0.22), transparent),
+      radial-gradient(ellipse 50% 40% at 80% 10%, rgba(138, 108, 255, 0.12), transparent),
+      var(--bg);
+  }
+  header img.icon {
+    width: 120px; height: 120px;
+    border-radius: 28px;
+    box-shadow: 0 24px 60px rgba(38, 99, 235, 0.45), 0 0 0 1px rgba(255,255,255,0.08);
+    margin-bottom: 32px;
+  }
+  header h1 {
+    font-size: clamp(38px, 6vw, 60px);
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+  }
+  header h1 .grad {
+    background: linear-gradient(92deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p.tagline {
+    margin: 20px auto 0;
+    max-width: 640px;
+    font-size: 19px;
+    color: var(--muted);
+  }
+  .cta { margin-top: 36px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 26px;
+    border-radius: 14px;
+    font-size: 15px; font-weight: 600;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary {
+    background: linear-gradient(92deg, var(--accent), var(--accent-2));
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(108, 140, 255, 0.35);
+  }
+  .btn-ghost {
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    border: 1px solid var(--card-border);
+  }
+  .badges { margin-top: 28px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    font-size: 12.5px; font-weight: 600;
+    color: var(--muted);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    padding: 5px 14px;
+  }
+
+  /* Sections */
+  section { padding: 72px 0; }
+  section.alt { background: var(--bg-2); }
+  h2 {
+    font-size: clamp(26px, 4vw, 34px);
+    font-weight: 750;
+    letter-spacing: -0.8px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  p.lead { text-align: center; color: var(--muted); max-width: 620px; margin: 0 auto 48px; font-size: 16.5px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 18px; }
+  .card {
+    background: linear-gradient(160deg, var(--card), rgba(26, 31, 66, 0.6));
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 26px;
+    transition: border-color .2s, transform .2s;
+  }
+  .card:hover { border-color: rgba(108, 140, 255, 0.5); transform: translateY(-3px); }
+  .card .emoji {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px;
+    font-size: 22px;
+    border-radius: 13px;
+    background: rgba(108, 140, 255, 0.14);
+    margin-bottom: 16px;
+  }
+  .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.2px; }
+  .card p { font-size: 14.5px; color: var(--muted); }
+  .card code { font-family: var(--mono); font-size: 12.5px; color: var(--accent); background: rgba(108,140,255,0.1); padding: 1px 6px; border-radius: 6px; }
+
+  /* Auth table */
+  .auth-list { display: grid; gap: 14px; max-width: 760px; margin: 0 auto; }
+  .auth-row {
+    display: flex; gap: 18px; align-items: flex-start;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 20px 24px;
+  }
+  .auth-row .tag {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 12px; font-weight: 700;
+    color: var(--gold);
+    background: rgba(224, 168, 46, 0.12);
+    border: 1px solid rgba(224, 168, 46, 0.3);
+    border-radius: 8px;
+    padding: 4px 10px;
+    margin-top: 2px;
+    min-width: 96px;
+    text-align: center;
+  }
+  .auth-row div p { font-size: 14.5px; color: var(--muted); }
+  .auth-row div strong { color: var(--text); font-size: 15px; }
+
+  /* Code blocks */
+  pre {
+    background: #0a0d1f;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: #c5cae9;
+  }
+  pre .c { color: #5c6499; }
+  pre .g { color: var(--green); }
+  .steps { max-width: 720px; margin: 0 auto; display: grid; gap: 28px; }
+  .step h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+  .step h3 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 999px;
+    background: linear-gradient(92deg, var(--accent), var(--accent-2));
+    color: #fff; font-size: 13px; font-weight: 700;
+    margin-right: 10px;
+  }
+  .note {
+    max-width: 720px; margin: 28px auto 0;
+    background: rgba(224, 168, 46, 0.08);
+    border: 1px solid rgba(224, 168, 46, 0.25);
+    border-radius: 14px;
+    padding: 16px 20px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .note strong { color: var(--gold); }
+
+  /* Architecture */
+  .arch { max-width: 760px; margin: 0 auto; }
+  .arch pre { font-size: 13px; }
+
+  /* Security strip */
+  .sec-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; max-width: 920px; margin: 0 auto; }
+  .sec-points .pt { display: flex; gap: 14px; align-items: flex-start; }
+  .sec-points .pt .dot {
+    flex-shrink: 0; width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: rgba(74, 222, 128, 0.12);
+    font-size: 17px;
+  }
+  .sec-points .pt p { font-size: 14.5px; color: var(--muted); }
+  .sec-points .pt strong { color: var(--text); }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid rgba(42, 48, 96, 0.5);
+    padding: 40px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    nav .links a:not(:first-child) { display: none; }
+    header { padding: 64px 0 56px; }
+    .auth-row { flex-direction: column; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <img src="icon.png" alt="Captain app icon">
+    <span class="brand">Captain ⎈</span>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#auth">Authentication</a>
+      <a href="#start">Getting Started</a>
+      <a href="#architecture">Architecture</a>
+      <a href="https://github.com/dpfaffenbauer/captain">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap">
+    <img class="icon" src="icon.png" alt="Captain — captain's cap on the Kubernetes helm">
+    <h1>Take the helm of your cluster.<br><span class="grad">From your iPhone.</span></h1>
+    <p class="tagline">
+      Captain is a Kubernetes client for iOS that dynamically discovers <strong>every</strong>
+      resource type in your cluster — CRDs included — and lets you browse, edit and delete
+      any of them. With native auth for EKS, GKE and AKS. No backend, no agent, no compromise.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/dpfaffenbauer/captain">View on GitHub</a>
+      <a class="btn btn-ghost" href="#start">Get Started</a>
+    </div>
+    <div class="badges">
+      <span class="badge">iOS · React Native (Expo)</span>
+      <span class="badge">TypeScript + Swift</span>
+      <span class="badge">Works with any conformant cluster</span>
+      <span class="badge">100% on-device</span>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything the API server knows, in your pocket</h2>
+    <p class="lead">
+      Captain doesn't ship a hard-coded list of resource kinds. It asks your cluster
+      what it can do — and renders all of it.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <span class="emoji">🔍</span>
+        <h3>Dynamic resource discovery</h3>
+        <p>All resource types are discovered live via <code>/api/v1</code> and <code>/apis/…</code> — Pods, Deployments and every CRD your cluster defines. If the API server knows it, Captain shows it.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">🗂️</span>
+        <h3>Curated overview</h3>
+        <p>A Lens-style browser with collapsible categories: Cluster, Workloads, Config, Network, Storage, Access Control — and Custom Resources grouped automatically by API group.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">✏️</span>
+        <h3>Read, edit, delete</h3>
+        <p>Lists with namespace filter, pagination and search. Full YAML detail view, an in-app YAML editor (PUT/replace) and delete with confirmation.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">🖥️</span>
+        <h3>Exec terminal</h3>
+        <p>Run one-shot commands in any container over the <code>kubectl exec</code> WebSocket protocol (<code>v4.channel.k8s.io</code>) — natively, with full cluster-CA trust and quick-command chips.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">🔌</span>
+        <h3>Port-forwarding</h3>
+        <p>A local TCP listener (Network.framework) bridges onto the cluster's <code>portforward</code> WebSocket endpoint. Active forwards show up in the Browse tab and can be stopped individually.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">📈</span>
+        <h3>Live metrics</h3>
+        <p>Node and pod usage via the metrics-server API (<code>metrics.k8s.io</code>): CPU/memory bars in the node list, a CPU column in the pod list. Hides itself automatically when metrics-server isn't installed.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">🔥</span>
+        <h3>Prometheus integration</h3>
+        <p>Captain auto-discovers Prometheus in the cluster and queries it through the API-server proxy — no extra networking or auth. One-hour CPU/memory sparklines and currently firing alerts, sorted by severity.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">📲</span>
+        <h3>Kubeconfig &amp; QR onboarding</h3>
+        <p>Paste a kubeconfig, pick contexts, done — or scan it as a QR code. Exec plugins (<code>aws</code>, <code>gke-gcloud-auth-plugin</code>, <code>kubelogin</code>) are detected and mapped to the matching native auth method.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">🎨</span>
+        <h3>Soft Bridge design</h3>
+        <p>A dark indigo theme with soft gradient cards, iOS-Settings-style squircle icons, a health-ring dashboard, a floating tab bar and bottom sheets for cluster and namespace switching.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="auth" class="alt">
+  <div class="wrap">
+    <h2>Native auth for every major cloud</h2>
+    <p class="lead">
+      No CLI, no exec plugins, no jump host. Captain implements each provider's
+      token flow directly on the device.
+    </p>
+    <div class="auth-list">
+      <div class="auth-row">
+        <span class="tag">AWS EKS</span>
+        <div>
+          <strong>SigV4-presigned STS tokens</strong>
+          <p>Captain produces <code>k8s-aws-v1.…</code> tokens on-device — the exact equivalent of <code>aws eks get-token</code> — and refreshes them automatically. Supports temporary STS credentials with a session token.</p>
+        </div>
+      </div>
+      <div class="auth-row">
+        <span class="tag">Google GKE</span>
+        <div>
+          <strong>OAuth 2.0 with PKCE</strong>
+          <p>Sign in with Google using an iOS OAuth client. Refresh tokens are stored securely and renewed automatically.</p>
+        </div>
+      </div>
+      <div class="auth-row">
+        <span class="tag">Azure AKS</span>
+        <div>
+          <strong>Microsoft Entra ID OAuth 2.0 (PKCE)</strong>
+          <p>Authenticates against the AKS AAD server app for clusters with managed Entra ID integration.</p>
+        </div>
+      </div>
+      <div class="auth-row">
+        <span class="tag">Bearer</span>
+        <div>
+          <strong>Bearer tokens</strong>
+          <p>Use ServiceAccount tokens or any other bearer token for self-hosted and on-prem clusters.</p>
+        </div>
+      </div>
+      <div class="auth-row">
+        <span class="tag">mTLS</span>
+        <div>
+          <strong>Client certificates</strong>
+          <p>PKCS#12 client certificates, handled natively via URLSession. The native <code>KubeHttp</code> module also validates server certificates against your cluster's own CA — essential for EKS, GKE and AKS endpoints.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>Getting started</h2>
+    <p class="lead">Requirements: macOS with Xcode 16+, Node 20+, CocoaPods.</p>
+    <div class="steps">
+      <div class="step">
+        <h3><span class="num">1</span>Clone and build</h3>
+<pre><span class="c"># clone the repository</span>
+git clone https://github.com/dpfaffenbauer/captain.git
+cd captain
+
+npm install
+npx expo run:ios   <span class="c"># builds the iOS app incl. the native KubeHttp module</span></pre>
+      </div>
+      <div class="step">
+        <h3><span class="num">2</span>Create a token (any cluster)</h3>
+<pre>kubectl create serviceaccount captain -n kube-system
+kubectl create clusterrolebinding captain \
+  --clusterrole=cluster-admin \
+  --serviceaccount=kube-system:captain
+kubectl create token captain -n kube-system --duration=8760h</pre>
+      </div>
+      <div class="step">
+        <h3><span class="num">3</span>Onboard in seconds with QR</h3>
+<pre>kubectl config view --minify --raw | qrencode -t png <span class="c"># scan it in Captain</span></pre>
+      </div>
+    </div>
+    <div class="note">
+      <strong>Note:</strong> Custom cluster CAs and client certificates require a development
+      build (<code>npx expo run:ios</code>). In Expo Go, Captain falls back to <code>fetch()</code>,
+      which only works against API servers with a publicly trusted certificate.
+      For a physical device, set a signing team in Xcode or run
+      <code>npx expo run:ios --device</code>.
+    </div>
+  </div>
+</section>
+
+<section id="architecture" class="alt">
+  <div class="wrap">
+    <h2>Architecture</h2>
+    <p class="lead">
+      A TypeScript app on Expo Router, with a small native Swift module where iOS
+      networking needs to go beyond what JavaScript can do.
+    </p>
+    <div class="arch">
+<pre>app/                          <span class="c">Screens (expo-router)</span>
+  index.tsx                   <span class="c">Cluster overview</span>
+  cluster-form.tsx            <span class="c">Add/edit clusters incl. cloud auth</span>
+  kubeconfig-import.tsx       <span class="c">Kubeconfig import</span>
+  cluster/[id]/index.tsx      <span class="c">Resource types (discovery, grouped, search)</span>
+  cluster/[id]/list.tsx       <span class="c">Resource lists (namespace, pagination, search)</span>
+  cluster/[id]/item.tsx       <span class="c">YAML detail, editor, delete</span>
+src/
+  auth/                       <span class="c">EKS SigV4, Google/Azure OAuth, token cache</span>
+  kube/                       <span class="c">Transport, discovery, CRUD, kubeconfig parser,</span>
+                              <span class="c">metrics-server + Prometheus</span>
+  state/, storage/, ui/, util/
+modules/kube-http/            <span class="c">Native iOS module (Swift): TLS with custom CA,</span>
+                              <span class="c">insecure-skip-verify, mTLS via PKCS#12</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="wrap">
+    <h2>Security by architecture</h2>
+    <p class="lead">There is no backend. Captain talks directly to your API server — nothing else ever sees your cluster.</p>
+    <div class="sec-points">
+      <div class="pt">
+        <span class="dot">🔐</span>
+        <p><strong>Keychain only.</strong> All credentials are stored exclusively in the device's iOS Keychain via expo-secure-store.</p>
+      </div>
+      <div class="pt">
+        <span class="dot">📜</span>
+        <p><strong>Real TLS validation.</strong> Server certificates are checked against the cluster CA through a native URLSession delegate. Skipping TLS is possible — but clearly flagged as insecure.</p>
+      </div>
+      <div class="pt">
+        <span class="dot">🛰️</span>
+        <p><strong>Direct connection.</strong> No proxy, no relay, no telemetry. The app speaks to the Kubernetes API server and nothing in between.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>
+      Captain ⎈ &nbsp;·&nbsp;
+      <a href="https://github.com/dpfaffenbauer/captain">Source on GitHub</a> &nbsp;·&nbsp;
+      MIT-licensed
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
