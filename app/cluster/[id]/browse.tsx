@@ -96,6 +96,25 @@ export default function BrowseScreen() {
         <Loading />
       ) : (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll}>
+          <View style={{ gap: 9 }}>
+            <View style={styles.catHead}>
+              <Text style={styles.catTitle}>Apps</Text>
+            </View>
+            <Card style={styles.catCard}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => router.push({ pathname: '/cluster/[id]/helm', params: { id } })}
+              >
+                <SquircleIcon abbr="He" color="#36B3F4" />
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={styles.rowLabel}>Helm Releases</Text>
+                  <Text style={styles.rowSub}>Charts, history, values, manifests</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            </Card>
+          </View>
+
           {categories.map((category) => (
             <View key={category.key} style={{ gap: 9 }}>
               <View style={styles.catHead}>
