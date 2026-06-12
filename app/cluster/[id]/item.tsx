@@ -31,13 +31,15 @@ import {
   triggerCronJob,
 } from '../../../src/kube/client';
 import { startPortForward } from '../../../src/kube/portforward';
+import { findRelatedResources, RelatedGroup } from '../../../src/kube/related';
+import { abbreviationFor } from '../../../src/kube/categories';
 import { KubeApiError } from '../../../src/kube/transport';
 import { DiffLine, diffLines } from '../../../src/util/diff';
 import { summarizeResource, SummarySection } from '../../../src/kube/summarize';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { hapticTap, hapticWarning } from '../../../src/util/haptics';
 import { ApiResourceType } from '../../../src/types';
-import { BackButton, Card, StatusDot } from '../../../src/ui/kit';
+import { BackButton, Card, SquircleIcon, StatusDot } from '../../../src/ui/kit';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { ageOf } from '../../../src/util/format';
@@ -170,6 +172,7 @@ export default function ResourceItemScreen() {
 
   const [manifest, setManifest] = useState<Record<string, unknown> | null>(null);
   const [events, setEvents] = useState<ResourceEvent[]>([]);
+  const [related, setRelated] = useState<RelatedGroup[]>([]);
   const [tab, setTab] = useState<'overview' | 'yaml'>('overview');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -194,10 +197,14 @@ export default function ResourceItemScreen() {
     setLoading(true);
     setError('');
     try {
-      setManifest(await getResource(cluster, type, params.name, namespace));
+      const loaded = await getResource(cluster, type, params.name, namespace);
+      setManifest(loaded);
       listEventsFor(cluster, type.kind, params.name, namespace)
         .then(setEvents)
         .catch(() => setEvents([]));
+      findRelatedResources(cluster, type, loaded)
+        .then(setRelated)
+        .catch(() => setRelated([]));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -728,6 +735,45 @@ export default function ResourceItemScreen() {
           ) : (
             <>
               <SummaryCards sections={sections} />
+              {related.length > 0 ? (
+                <Card style={styles.summaryCard}>
+                  <Text style={styles.cardTitle}>Related</Text>
+                  {related.map((group) => (
+                    <View key={group.title}>
+                      <Text style={styles.relatedGroupTitle}>{group.title}</Text>
+                      {group.items.map((entry) => (
+                        <TouchableOpacity
+                          key={`${entry.type.kind}/${entry.namespace ?? ''}/${entry.name}`}
+                          style={styles.relatedRow}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/cluster/[id]/item',
+                              params: {
+                                id: params.id,
+                                group: entry.type.group,
+                                version: entry.type.version,
+                                plural: entry.type.plural,
+                                kind: entry.type.kind,
+                                namespaced: entry.type.namespaced ? '1' : '0',
+                                verbs: entry.type.verbs.join(','),
+                                name: entry.name,
+                                namespace: entry.namespace ?? '',
+                              },
+                            })
+                          }
+                        >
+                          <SquircleIcon abbr={abbreviationFor(entry.type)} color={colors.accent} size={24} />
+                          <Text style={styles.relatedName} numberOfLines={1}>
+                            {entry.name}
+                          </Text>
+                          {entry.note ? <Text style={styles.relatedNote}>{entry.note}</Text> : null}
+                          <Text style={styles.relatedChevron}>›</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ))}
+                </Card>
+              ) : null}
               {events.length > 0 ? (
                 <Card style={styles.summaryCard}>
                   <Text style={styles.cardTitle}>Events</Text>
@@ -839,6 +885,24 @@ const styles = StyleSheet.create({
   kvLabel: { color: colors.textDim, fontSize: 12.5, flexShrink: 1 },
   kvValue: { color: colors.text, fontSize: 12.5, flex: 1 },
   kvValueMono: { fontFamily: 'Menlo', fontSize: 11.5, color: colors.mono },
+  relatedGroupTitle: {
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  relatedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+  },
+  relatedName: { color: colors.text, fontSize: 13, fontWeight: '500', flex: 1 },
+  relatedNote: { color: colors.textDim, fontSize: 11.5 },
+  relatedChevron: { color: 'rgba(242,245,250,0.22)', fontSize: 16, fontWeight: '600' },
   eventRow: { paddingVertical: 7 },
   eventMessage: { color: colors.text, fontSize: 12.5, marginTop: 2, marginLeft: 14, lineHeight: 18 },
   yamlCard: { borderRadius: radius.card, backgroundColor: colors.backgroundDeep },

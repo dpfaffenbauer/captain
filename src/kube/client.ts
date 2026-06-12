@@ -65,6 +65,21 @@ export async function discoverResourceTypes(cluster: ClusterConfig): Promise<Api
   return result;
 }
 
+const discoveryCache = new Map<string, { at: number; types: Promise<ApiResourceType[]> }>();
+const DISCOVERY_TTL_MS = 5 * 60 * 1000;
+
+/** Discovery with a short-lived per-cluster cache (related-resources lookups). */
+export function discoverResourceTypesCached(cluster: ClusterConfig): Promise<ApiResourceType[]> {
+  const cached = discoveryCache.get(cluster.id);
+  if (cached && Date.now() - cached.at < DISCOVERY_TTL_MS) return cached.types;
+  const types = discoverResourceTypes(cluster).catch((caught) => {
+    discoveryCache.delete(cluster.id);
+    throw caught;
+  });
+  discoveryCache.set(cluster.id, { at: Date.now(), types });
+  return types;
+}
+
 export function resourceBasePath(type: ApiResourceType, namespace?: string): string {
   const prefix = type.group === '' ? '/api/v1' : `/apis/${type.group}/${type.version}`;
   if (type.namespaced && namespace) {
@@ -76,11 +91,19 @@ export function resourceBasePath(type: ApiResourceType, namespace?: string): str
 export async function listResources(
   cluster: ClusterConfig,
   type: ApiResourceType,
-  options: { namespace?: string; limit?: number; continueToken?: string } = {}
+  options: {
+    namespace?: string;
+    limit?: number;
+    continueToken?: string;
+    labelSelector?: string;
+    fieldSelector?: string;
+  } = {}
 ): Promise<KubeList> {
   const params = new URLSearchParams();
   params.set('limit', String(options.limit ?? 200));
   if (options.continueToken) params.set('continue', options.continueToken);
+  if (options.labelSelector) params.set('labelSelector', options.labelSelector);
+  if (options.fieldSelector) params.set('fieldSelector', options.fieldSelector);
 
   const body = await kubeRequestJson<{
     items?: Array<{ metadata?: { name?: string; namespace?: string; creationTimestamp?: string } }>;
