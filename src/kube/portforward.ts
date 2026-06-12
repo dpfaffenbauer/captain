@@ -1,4 +1,8 @@
 import {
+  endPortForwardActivity,
+  startPortForwardActivity,
+} from '../../modules/captain-widget';
+import {
   isNativeTransportAvailable,
   nativePortForwardStart,
   nativePortForwardStop,
@@ -15,6 +19,8 @@ export interface PortForward {
   localPort: number;
   remotePort: number;
   startedAt: number;
+  /** Live Activity id ('' when unavailable). */
+  activityId?: string;
 }
 
 let forwards: PortForward[] = [];
@@ -67,10 +73,24 @@ export async function startPortForward(
   };
   forwards = [...forwards, forward];
   notify();
+  // Show the forward in the Dynamic Island / on the lock screen.
+  void startPortForwardActivity(pod, handle.localPort, remotePort).then((activityId) => {
+    const entry = forwards.find((candidate) => candidate.id === forward.id);
+    if (entry) {
+      entry.activityId = activityId;
+    } else if (activityId) {
+      // The forward was stopped before the activity came up.
+      void endPortForwardActivity(activityId);
+    }
+  });
   return forward;
 }
 
 export function stopPortForward(id: string): void {
+  const entry = forwards.find((forward) => forward.id === id);
+  if (entry?.activityId) {
+    void endPortForwardActivity(entry.activityId);
+  }
   try {
     nativePortForwardStop(id);
   } finally {

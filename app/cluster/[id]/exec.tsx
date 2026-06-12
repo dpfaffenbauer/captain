@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { execCommand } from '../../../src/kube/exec';
+import { execCommand, ShellSession, startShellSession } from '../../../src/kube/exec';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { BackButton, Pill } from '../../../src/ui/kit';
 import { EmptyState } from '../../../src/ui/components';
@@ -22,6 +22,20 @@ interface TermLine {
 }
 
 const QUICK_COMMANDS = ['ls', 'env', 'ps aux', 'cat /etc/resolv.conf', 'nslookup kubernetes'];
+
+/** Strips ANSI escape sequences and carriage returns from PTY output. */
+function stripAnsi(text: string): string {
+  return text
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b[=>]/g, '')
+    .replace(/\r/g, '');
+}
+
+const MAX_TERM_CHARS = 60_000;
 
 export default function ExecScreen() {
   const params = useLocalSearchParams<{
@@ -39,7 +53,62 @@ export default function ExecScreen() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
+  // Interactive PTY mode: one persistent `kubectl exec -it`-style session.
+  const [interactive, setInteractive] = useState(false);
+  const [term, setTerm] = useState('');
+  const [shellState, setShellState] = useState<'connecting' | 'open' | 'closed'>('closed');
+  const [shellError, setShellError] = useState('');
+  const shellRef = useRef<ShellSession | null>(null);
+
   const container = useMemo(() => params.container || undefined, [params.container]);
+
+  useEffect(() => {
+    if (!interactive || !cluster) return;
+    let cancelled = false;
+    setTerm('');
+    setShellError('');
+    setShellState('connecting');
+    startShellSession(cluster, params.namespace ?? '', params.name ?? '', container, {
+      onOutput: (text) => {
+        if (cancelled) return;
+        setShellState('open');
+        setTerm((current) => {
+          const next = current + stripAnsi(text);
+          return next.length > MAX_TERM_CHARS ? next.slice(next.length - MAX_TERM_CHARS) : next;
+        });
+      },
+      onClosed: (failure) => {
+        if (cancelled) return;
+        setShellState('closed');
+        if (failure) setShellError(failure);
+      },
+    })
+      .then((session) => {
+        if (cancelled) {
+          session.stop();
+          return;
+        }
+        shellRef.current = session;
+        setShellState('open');
+      })
+      .catch((caught) => {
+        if (cancelled) return;
+        setShellState('closed');
+        setShellError(caught instanceof Error ? caught.message : String(caught));
+      });
+    return () => {
+      cancelled = true;
+      shellRef.current?.stop();
+      shellRef.current = null;
+      setShellState('closed');
+    };
+  }, [interactive, cluster, params.namespace, params.name, container]);
+
+  const sendInteractive = (raw: string) => {
+    if (!shellRef.current || shellState !== 'open') return;
+    shellRef.current.sendLine(raw);
+    setInput('');
+  };
 
   const run = async (commandRaw: string) => {
     const command = commandRaw.trim();
@@ -86,11 +155,31 @@ export default function ExecScreen() {
             {params.name}
           </Text>
           <Text style={styles.headerSub}>
-            {container ?? 'pod'} · /bin/sh
+            {container ?? 'pod'} · /bin/sh{interactive ? ' -it' : ''}
           </Text>
         </View>
+        <Pill
+          label={interactive ? 'Interactive' : 'One-shot'}
+          active={interactive}
+          onPress={() => setInteractive(!interactive)}
+        />
         <View style={styles.connectedPill}>
-          <Text style={styles.connectedText}>{busy ? 'Running…' : 'Ready'}</Text>
+          <Text
+            style={[
+              styles.connectedText,
+              interactive && shellState === 'closed' && { color: colors.dangerLight },
+            ]}
+          >
+            {interactive
+              ? shellState === 'open'
+                ? 'Connected'
+                : shellState === 'connecting'
+                  ? 'Connecting…'
+                  : 'Closed'
+              : busy
+                ? 'Running…'
+                : 'Ready'}
+          </Text>
         </View>
       </View>
 
@@ -101,10 +190,25 @@ export default function ExecScreen() {
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
         keyboardShouldPersistTaps="handled"
       >
-        {lines.length === 0 ? (
+        {interactive ? (
+          <>
+            {shellError ? <Text style={[styles.line, styles.lineErr]}>{shellError}</Text> : null}
+            <Text style={styles.line} selectable>
+              {term ||
+                (shellState === 'connecting'
+                  ? 'Connecting to /bin/sh…'
+                  : shellState === 'closed'
+                    ? '— session closed —'
+                    : ' ')}
+            </Text>
+            {shellState === 'closed' && term ? (
+              <Text style={styles.placeholder}>— session closed —</Text>
+            ) : null}
+          </>
+        ) : lines.length === 0 ? (
           <Text style={styles.placeholder}>
             Shell ready. Each command runs as a fresh `/bin/sh -c` in the container. Type below or
-            tap a suggestion.
+            tap a suggestion — or switch to Interactive for a persistent PTY session.
           </Text>
         ) : (
           lines.map((line, index) => (
@@ -131,7 +235,11 @@ export default function ExecScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {QUICK_COMMANDS.map((command) => (
-          <Pill key={command} label={command} onPress={() => void run(command)} />
+          <Pill
+            key={command}
+            label={command}
+            onPress={() => (interactive ? sendInteractive(command) : void run(command))}
+          />
         ))}
       </ScrollView>
 
@@ -141,19 +249,23 @@ export default function ExecScreen() {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          onSubmitEditing={() => void run(input)}
+          onSubmitEditing={() => (interactive ? sendInteractive(input) : void run(input))}
+          blurOnSubmit={false}
           placeholder="command…"
           placeholderTextColor={colors.textFaint}
           autoCapitalize="none"
           autoCorrect={false}
-          editable={!busy}
+          editable={interactive ? shellState === 'open' : !busy}
         />
         <TouchableOpacity
-          style={[styles.runButton, busy && { opacity: 0.5 }]}
-          onPress={() => void run(input)}
-          disabled={busy}
+          style={[
+            styles.runButton,
+            (interactive ? shellState !== 'open' : busy) && { opacity: 0.5 },
+          ]}
+          onPress={() => (interactive ? sendInteractive(input) : void run(input))}
+          disabled={interactive ? shellState !== 'open' : busy}
         >
-          <Text style={styles.runText}>Run</Text>
+          <Text style={styles.runText}>{interactive ? 'Send' : 'Run'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

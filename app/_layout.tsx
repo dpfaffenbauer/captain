@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { syncBackgroundAlerts } from '../src/background/alerts';
 import { ClustersProvider } from '../src/state/ClustersContext';
 import { colors } from '../src/ui/theme';
 import { authenticate, loadAppLockSetting } from '../src/util/applock';
@@ -71,6 +72,7 @@ function AppLockGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   useEffect(() => {
     void loadHapticsSetting();
+    void syncBackgroundAlerts();
   }, []);
   return (
     <ClustersProvider>
@@ -86,6 +88,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="open" options={{ headerShown: false }} />
           <Stack.Screen name="cluster-form" options={{ title: 'Cluster' }} />
           <Stack.Screen name="kubeconfig-import" options={{ title: 'Kubeconfig importieren' }} />
           <Stack.Screen name="qr-scan" options={{ title: 'QR-Code scannen' }} />

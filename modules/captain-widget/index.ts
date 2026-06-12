@@ -17,6 +17,8 @@ export interface WidgetSnapshot {
 
 interface CaptainWidgetNativeModule {
   setSnapshot(json: string): void;
+  startPortForwardActivity(pod: string, localPort: number, remotePort: number): Promise<string>;
+  endPortForwardActivity(activityId: string): Promise<void>;
 }
 
 const native = requireOptionalNativeModule<CaptainWidgetNativeModule>('CaptainWidget');
@@ -30,5 +32,30 @@ export function publishWidgetSnapshot(snapshot: WidgetSnapshot): void {
     native?.setSnapshot(JSON.stringify(snapshot));
   } catch {
     // The widget is cosmetic; never let it break the app.
+  }
+}
+
+/**
+ * Starts a Live Activity for an active port forward (Dynamic Island / lock
+ * screen). Resolves '' when Live Activities are unavailable or disabled.
+ */
+export async function startPortForwardActivity(
+  pod: string,
+  localPort: number,
+  remotePort: number
+): Promise<string> {
+  try {
+    return (await native?.startPortForwardActivity(pod, localPort, remotePort)) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export async function endPortForwardActivity(activityId: string): Promise<void> {
+  if (!activityId) return;
+  try {
+    await native?.endPortForwardActivity(activityId);
+  } catch {
+    // Cosmetic only.
   }
 }

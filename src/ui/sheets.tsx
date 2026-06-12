@@ -8,6 +8,10 @@ import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
 import { useClusters } from '../state/ClustersContext';
 import { ClusterConfig } from '../types';
 import {
+  loadBackgroundAlertsSetting,
+  setBackgroundAlertsEnabled,
+} from '../background/alerts';
+import {
   authenticate,
   isBiometricAvailable,
   loadAppLockSetting,
@@ -153,14 +157,24 @@ export function SettingsSheet({
   const [haptics, setHaptics] = useState(true);
   const [appLock, setAppLock] = useState(false);
   const [biometrics, setBiometrics] = useState(false);
+  const [bgAlerts, setBgAlerts] = useState(false);
 
   useEffect(() => {
     if (visible) {
       void loadHapticsSetting().then(setHaptics);
       void loadAppLockSetting().then(setAppLock);
       void isBiometricAvailable().then(setBiometrics);
+      void loadBackgroundAlertsSetting().then(setBgAlerts);
     }
   }, [visible]);
+
+  const toggleBgAlerts = (value: boolean) => {
+    setBgAlerts(value);
+    void setBackgroundAlertsEnabled(value).then((granted) => {
+      // Roll the switch back when notification permission was denied.
+      if (value && !granted) setBgAlerts(false);
+    });
+  };
 
   const toggleAppLock = (value: boolean) => {
     if (!value) {
@@ -216,6 +230,17 @@ export function SettingsSheet({
               setHaptics(value);
               void setHapticsEnabled(value);
             }}
+            trackColor={{ true: colors.accent, false: 'rgba(255,255,255,0.14)' }}
+          />
+        </View>
+        <View style={[styles.settingRow, styles.settingDivider]}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.settingTitle}>Background alerts</Text>
+            <Text style={styles.rowSub}>Notify when a cluster degrades (best effort)</Text>
+          </View>
+          <Switch
+            value={bgAlerts}
+            onValueChange={toggleBgAlerts}
             trackColor={{ true: colors.accent, false: 'rgba(255,255,255,0.14)' }}
           />
         </View>

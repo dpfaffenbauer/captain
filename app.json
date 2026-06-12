@@ -18,7 +18,8 @@
           "NSAllowsArbitraryLoads": true
         },
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "Captain schützt gespeicherte Cluster-Zugangsdaten mit Face ID."
+        "NSFaceIDUsageDescription": "Captain schützt gespeicherte Cluster-Zugangsdaten mit Face ID.",
+        "NSSupportsLiveActivities": true
       },
       "appleTeamId": "UJ65F5V824"
     },
@@ -43,6 +44,8 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-local-authentication",
+      "expo-background-task",
+      "expo-notifications",
       "@bacons/apple-targets",
       [
         "expo-camera",

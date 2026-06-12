@@ -47,6 +47,7 @@ import { useClusters } from '../../../src/state/ClustersContext';
 import { hapticTap, hapticWarning } from '../../../src/util/haptics';
 import { ApiResourceType } from '../../../src/types';
 import { BackButton, Card, SquircleIcon, StatusDot } from '../../../src/ui/kit';
+import { YamlView } from '../../../src/ui/YamlView';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { ageOf } from '../../../src/util/format';
@@ -65,37 +66,6 @@ const SCALABLE = new Set(['apps/Deployment', 'apps/StatefulSet', 'apps/ReplicaSe
 const RESTARTABLE = new Set(['apps/Deployment', 'apps/StatefulSet', 'apps/DaemonSet']);
 
 const STATUS_COLORS = { ok: colors.success, warn: colors.warning, bad: colors.danger } as const;
-
-/** Simple line-based YAML syntax coloring like the design's viewer. */
-function YamlView({ text }: { text: string }) {
-  const lines = useMemo(() => text.split('\n'), [text]);
-  return (
-    <View>
-      {lines.map((line, index) => {
-        const match = /^(\s*-?\s*[^:]+:)(.*)$/.exec(line);
-        if (!match) {
-          return (
-            <Text key={index} style={styles.yamlValue}>
-              {line || ' '}
-            </Text>
-          );
-        }
-        const value = match[2];
-        const valueColor = /^\s*-?[0-9.]+\s*$/.test(value)
-          ? colors.monoNumber
-          : value.trim()
-            ? colors.monoString
-            : colors.textFaint;
-        return (
-          <Text key={index} style={styles.yamlLine}>
-            <Text style={styles.yamlKey}>{match[1]}</Text>
-            <Text style={[styles.yamlValue, { color: valueColor }]}>{value}</Text>
-          </Text>
-        );
-      })}
-    </View>
-  );
-}
 
 function SummaryCards({ sections }: { sections: SummarySection[] }) {
   return (
@@ -1010,9 +980,6 @@ const styles = StyleSheet.create({
   eventRow: { paddingVertical: 7 },
   eventMessage: { color: colors.text, fontSize: 12.5, marginTop: 2, marginLeft: 14, lineHeight: 18 },
   yamlCard: { borderRadius: radius.card, backgroundColor: colors.backgroundDeep },
-  yamlLine: { fontFamily: 'Menlo', fontSize: 10.5, lineHeight: 18 },
-  yamlKey: { color: colors.monoKey, fontFamily: 'Menlo', fontSize: 10.5 },
-  yamlValue: { color: colors.mono, fontFamily: 'Menlo', fontSize: 10.5, lineHeight: 18 },
   deleteButton: {
     backgroundColor: 'rgba(251,113,133,0.1)',
     borderWidth: 1,
