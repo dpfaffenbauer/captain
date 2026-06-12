@@ -117,6 +117,13 @@ export default function HomeScreen() {
         <View style={styles.section}>
           {clusters.length > 0 ? <Text style={styles.sectionTitle}>Add cluster</Text> : null}
           <ConnectOption
+            icon="▣"
+            iconBg="#6B8AFF"
+            title="Scan QR code"
+            subtitle="Kubeconfig as QR, e.g. from qrencode"
+            onPress={() => router.push('/qr-scan')}
+          />
+          <ConnectOption
             icon="⧉"
             iconBg="#3FE0C5"
             title="Paste kubeconfig"
@@ -125,7 +132,7 @@ export default function HomeScreen() {
           />
           <ConnectOption
             icon="⌘"
-            iconBg="#6B8AFF"
+            iconBg="#A78BFA"
             title="Single Sign-On"
             subtitle="EKS · GKE · AKS · OIDC"
             onPress={() => router.push('/cluster-form')}

@@ -43,6 +43,19 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
   Server-Zertifikate gegen die in der Kubeconfig hinterlegte CA
   (`certificate-authority-data`) — nötig, weil EKS/GKE/AKS-Endpunkte von
   cluster-eigenen CAs signiert sind.
+- **Exec-Terminal**: One-Shot-Kommandos via `kubectl exec`-WebSocket
+  (`v4.channel.k8s.io`), nativ mit Cluster-CA-Trust — inkl. Quick-Command-
+  Chips im Terminal-UI.
+- **Port-Forwarding**: lokaler TCP-Listener (Network.framework) bridgt auf
+  den `portforward`-WebSocket-Endpunkt; aktive Forwards erscheinen im
+  Browse-Tab unter Network und sind einzeln stoppbar.
+- **Live-Metriken**: Node- und Pod-Usage über die metrics-server-API
+  (`metrics.k8s.io`) — CPU/Memory-Balken in der Node-Liste, CPU-Spalte in
+  der Pod-Liste; ohne metrics-server blendet sich das automatisch aus.
+- **QR-Onboarding**: Kubeconfig als QR-Code scannen
+  (`kubectl config view --minify --raw | qrencode -t png`).
+- **Settings-Sheet**: Default-Namespace, Haptics-Toggle (echtes Tap-Feedback
+  bei destruktiven Aktionen), Cluster bearbeiten, Sign-out aus allen Clustern.
 
 ## Projektstruktur
 
@@ -149,6 +162,7 @@ base64 -i client.p12 | pbcopy
 - Kubeconfig-`exec`-Plugins können nicht ausgeführt werden (kein Subprozess auf
   iOS); der Import mappt sie auf die nativen Auth-Methoden und markiert
   fehlende Felder.
-- Pod-Logs, `exec` und Watch-Streams sind noch nicht implementiert.
+- Exec führt One-Shot-Kommandos aus (`/bin/sh -c …`), kein interaktives TTY.
+- Log-Follow pollt den Tail (3 s), kein echter `follow`-Stream.
 - Bearbeiten nutzt PUT (replace); bei Konflikten (HTTP 409) neu laden und
   erneut speichern.

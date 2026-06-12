@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -13,6 +13,7 @@ import {
   ResourceCategory,
 } from '../../../src/kube/categories';
 import { discoverResourceTypes } from '../../../src/kube/client';
+import { getForwards, subscribeForwards } from '../../../src/kube/portforward';
 import { namespaceLabel, useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType } from '../../../src/types';
@@ -33,6 +34,9 @@ export default function BrowseScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [nsOpen, setNsOpen] = useState(false);
+  const forwardsCount = useSyncExternalStore(subscribeForwards, getForwards).filter(
+    (forward) => forward.clusterId === id
+  ).length;
 
   const load = useCallback(async () => {
     if (!cluster) return;
@@ -127,6 +131,28 @@ export default function BrowseScreen() {
                     <Text style={styles.chevron}>›</Text>
                   </TouchableOpacity>
                 ))}
+                {category.key === 'network' ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.row,
+                      { borderTopColor: colors.borderFaint, borderTopWidth: StyleSheet.hairlineWidth },
+                    ]}
+                    onPress={() =>
+                      router.push({ pathname: '/cluster/[id]/forwards', params: { id } })
+                    }
+                  >
+                    <SquircleIcon abbr="Pf" color={category.color} />
+                    <View style={{ flex: 1, gap: 1 }}>
+                      <Text style={styles.rowLabel}>Port Forwards</Text>
+                    </View>
+                    {forwardsCount > 0 ? (
+                      <View style={styles.liveBadge}>
+                        <Text style={styles.liveBadgeText}>{forwardsCount} live</Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.chevron}>›</Text>
+                  </TouchableOpacity>
+                ) : null}
               </Card>
             </View>
           ))}
@@ -173,4 +199,11 @@ const styles = StyleSheet.create({
   rowSub: { color: colors.textFaint, fontSize: 10.5 },
   scopeTag: { color: colors.textFaint, fontSize: 10.5, fontWeight: '600' },
   chevron: { color: 'rgba(242,245,250,0.22)', fontSize: 18, fontWeight: '600' },
+  liveBadge: {
+    backgroundColor: 'rgba(143,165,255,0.15)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  liveBadgeText: { color: colors.link, fontSize: 10.5, fontWeight: '700' },
 });

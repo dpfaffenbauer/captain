@@ -19,7 +19,7 @@ export class KubeApiError extends Error {
   }
 }
 
-function caPemOf(cluster: ClusterConfig): string | undefined {
+export function caPemOf(cluster: ClusterConfig): string | undefined {
   if (!cluster.caData) return undefined;
   const trimmed = cluster.caData.trim();
   // kubeconfig stores the PEM base64-encoded; accept raw PEM pastes too.

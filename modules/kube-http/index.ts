@@ -1,16 +1,19 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-export interface NativeRequestOptions {
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  body?: string;
+export interface TlsOptions {
   /** PEM-encoded CA bundle used to validate the server certificate. */
   caPem?: string;
   insecure?: boolean;
   /** base64-encoded PKCS#12 bundle for client certificate auth. */
   pkcs12?: string;
   pkcs12Password?: string;
+}
+
+export interface NativeRequestOptions extends TlsOptions {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
   timeoutMs?: number;
 }
 
@@ -20,8 +23,39 @@ export interface NativeResponse {
   body: string;
 }
 
+export interface NativeExecOptions extends TlsOptions {
+  /** wss:// exec URL including command/container query parameters. */
+  url: string;
+  headers: Record<string, string>;
+  timeoutMs?: number;
+}
+
+export interface NativeExecResult {
+  stdout: string;
+  stderr: string;
+  /** v1.Status JSON from the error channel ('' on success). */
+  error: string;
+  timedOut: boolean;
+}
+
+export interface NativePortForwardOptions extends TlsOptions {
+  /** wss:// portforward URL including ?ports=<remotePort>. */
+  url: string;
+  headers: Record<string, string>;
+  /** 0 = pick a free local port automatically. */
+  localPort?: number;
+}
+
+export interface NativePortForwardHandle {
+  id: string;
+  localPort: number;
+}
+
 interface KubeHttpNativeModule {
   request(options: NativeRequestOptions): Promise<NativeResponse>;
+  exec(options: NativeExecOptions): Promise<NativeExecResult>;
+  portForwardStart(options: NativePortForwardOptions): Promise<NativePortForwardHandle>;
+  portForwardStop(id: string): void;
 }
 
 const native = requireOptionalNativeModule<KubeHttpNativeModule>('KubeHttp');
@@ -35,9 +69,27 @@ export function isNativeTransportAvailable(): boolean {
   return native != null;
 }
 
-export async function nativeRequest(options: NativeRequestOptions): Promise<NativeResponse> {
+function requireNative(): KubeHttpNativeModule {
   if (!native) {
     throw new Error('KubeHttp native module is not available in this build');
   }
-  return native.request(options);
+  return native;
+}
+
+export async function nativeRequest(options: NativeRequestOptions): Promise<NativeResponse> {
+  return requireNative().request(options);
+}
+
+export async function nativeExec(options: NativeExecOptions): Promise<NativeExecResult> {
+  return requireNative().exec(options);
+}
+
+export async function nativePortForwardStart(
+  options: NativePortForwardOptions
+): Promise<NativePortForwardHandle> {
+  return requireNative().portForwardStart(options);
+}
+
+export function nativePortForwardStop(id: string): void {
+  requireNative().portForwardStop(id);
 }

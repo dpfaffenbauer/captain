@@ -11,6 +11,14 @@ import {
   View,
 } from 'react-native';
 import { listResources, restartRollout } from '../../../src/kube/client';
+import {
+  formatCpuUsage,
+  formatMemoryUsage,
+  getNodeMetrics,
+  getPodMetrics,
+  ResourceUsage,
+} from '../../../src/kube/metrics';
+import { parseCpu, parseMemory } from '../../../src/kube/quantity';
 import { namespaceLabel, useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, KubeListItem } from '../../../src/types';
@@ -83,9 +91,11 @@ export default function ResourceListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [nsOpen, setNsOpen] = useState(false);
+  const [usage, setUsage] = useState<Map<string, ResourceUsage> | null>(null);
 
   const isPods = type.group === '' && type.kind === 'Pod';
   const isDeployments = type.group === 'apps' && type.kind === 'Deployment';
+  const isNodes = type.group === '' && type.kind === 'Node';
 
   const load = useCallback(
     async (reset: boolean, token?: string) => {
@@ -109,6 +119,12 @@ export default function ResourceListScreen() {
         }
         setItems(next);
         setContinueToken(result.continueToken);
+        // Live usage from the metrics-server, when installed.
+        if (isPods) {
+          void getPodMetrics(cluster, type.namespaced && namespace !== '' ? namespace : undefined).then(setUsage);
+        } else if (isNodes) {
+          void getNodeMetrics(cluster).then(setUsage);
+        }
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : String(caught));
       } finally {
@@ -177,6 +193,7 @@ export default function ResourceListScreen() {
     if (isPods) {
       const sev = podSeverity(raw);
       const restarts = podRestarts(raw);
+      const podUsage = usage?.get(`${item.namespace ?? ''}/${item.name}`);
       return (
         <TouchableOpacity onPress={() => openItem(item)}>
           <Card style={styles.podCard}>
@@ -194,9 +211,76 @@ export default function ResourceListScreen() {
               </View>
             </View>
             <View style={styles.podRight}>
-              <Text style={styles.podNs}>{item.namespace}</Text>
+              <Text style={styles.podCpu}>
+                {podUsage ? formatCpuUsage(podUsage.cpu) : item.namespace}
+              </Text>
               <Text style={styles.podAge}>{ageOf(item.creationTimestamp)}</Text>
             </View>
+          </Card>
+        </TouchableOpacity>
+      );
+    }
+
+    if (isNodes) {
+      const conditions: any[] = raw.status?.conditions ?? [];
+      const ready = conditions.find((c: any) => c.type === 'Ready')?.status === 'True';
+      const pressure = conditions.find(
+        (c: any) => c.type.endsWith('Pressure') && c.status === 'True'
+      );
+      const status = !ready ? 'NotReady' : pressure ? pressure.type : 'Ready';
+      const tone = !ready ? colors.danger : pressure ? colors.warning : colors.success;
+      const role = Object.keys(raw.metadata?.labels ?? {})
+        .find((label: string) => label.startsWith('node-role.kubernetes.io/'))
+        ?.split('/')[1] ?? 'worker';
+      const version = raw.status?.nodeInfo?.kubeletVersion ?? '';
+      const nodeUsage = usage?.get(item.name);
+      const cpuAlloc = parseCpu(raw.status?.allocatable?.cpu);
+      const memAlloc = parseMemory(raw.status?.allocatable?.memory);
+      const cpuPct = nodeUsage && cpuAlloc > 0 ? (nodeUsage.cpu / cpuAlloc) * 100 : undefined;
+      const memPct = nodeUsage && memAlloc > 0 ? (nodeUsage.memory / memAlloc) * 100 : undefined;
+      const barColor = (pct: number) =>
+        pct >= 85 ? colors.danger : pct >= 60 ? colors.warning : colors.accent;
+      return (
+        <TouchableOpacity onPress={() => openItem(item)}>
+          <Card
+            style={styles.nodeCard}
+            borderColor={tone === colors.warning ? 'rgba(251,191,85,0.3)' : undefined}
+          >
+            <View style={styles.nodeHead}>
+              <StatusDot color={tone} size={9} />
+              <Text style={[styles.itemName, { flex: 1, fontSize: 14.5 }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={[styles.nodeStatus, { color: tone }]}>{status}</Text>
+            </View>
+            <View style={styles.nodeMetaRow}>
+              <Text style={styles.podMeta}>{role}</Text>
+              <Text style={styles.podMeta}>{version}</Text>
+            </View>
+            {cpuPct !== undefined || memPct !== undefined ? (
+              <View style={styles.nodeBars}>
+                {cpuPct !== undefined ? (
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <View style={styles.nodeBarHead}>
+                      <Text style={styles.nodeBarLabel}>CPU</Text>
+                      <Text style={styles.nodeBarLabel}>{Math.round(cpuPct)}%</Text>
+                    </View>
+                    <UsageBar percent={cpuPct} color={barColor(cpuPct)} />
+                  </View>
+                ) : null}
+                {memPct !== undefined && nodeUsage ? (
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <View style={styles.nodeBarHead}>
+                      <Text style={styles.nodeBarLabel}>Memory</Text>
+                      <Text style={styles.nodeBarLabel}>
+                        {formatMemoryUsage(nodeUsage.memory)} · {Math.round(memPct)}%
+                      </Text>
+                    </View>
+                    <UsageBar percent={memPct} color={barColor(memPct)} />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
           </Card>
         </TouchableOpacity>
       );
@@ -355,7 +439,15 @@ const styles = StyleSheet.create({
   podMeta: { color: colors.textDim, fontSize: 11.5 },
   podRight: { alignItems: 'flex-end', gap: 3 },
   podNs: { color: 'rgba(242,245,250,0.4)', fontSize: 11 },
+  podCpu: { color: 'rgba(242,245,250,0.7)', fontSize: 12, fontWeight: '600' },
   podAge: { color: colors.textFaint, fontSize: 10.5 },
+  nodeCard: { gap: 11, padding: 15 },
+  nodeHead: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  nodeStatus: { fontSize: 11.5, fontWeight: '600' },
+  nodeMetaRow: { flexDirection: 'row', gap: 12 },
+  nodeBars: { flexDirection: 'row', gap: 12 },
+  nodeBarHead: { flexDirection: 'row', justifyContent: 'space-between' },
+  nodeBarLabel: { color: 'rgba(242,245,250,0.5)', fontSize: 10.5, fontWeight: '600' },
   depCard: { gap: 10, padding: 15 },
   depHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   depReady: { fontSize: 12.5, fontWeight: '700' },

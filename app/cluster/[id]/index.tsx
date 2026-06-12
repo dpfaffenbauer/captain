@@ -21,7 +21,7 @@ import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, ClusterConfig } from '../../../src/types';
 import { FloatingTabBar } from '../../../src/ui/FloatingTabBar';
 import { Card, HealthRing, StatusDot, UsageBar } from '../../../src/ui/kit';
-import { ClusterSwitcherSheet } from '../../../src/ui/sheets';
+import { ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from '../../../src/ui/sheets';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { ageOf } from '../../../src/util/format';
@@ -200,13 +200,15 @@ function StatCard({
 export default function DashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getById, remove } = useClusters();
+  const { getById } = useClusters();
   const cluster = getById(id);
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [nsOpen, setNsOpen] = useState(false);
 
   const openPod = useCallback(
     (namespace: string, name: string) => {
@@ -259,22 +261,7 @@ export default function DashboardScreen() {
     .join('')
     .toUpperCase();
 
-  const onAvatar = () => {
-    Alert.alert(cluster.name, cluster.server, [
-      {
-        text: 'Cluster bearbeiten',
-        onPress: () => router.push({ pathname: '/cluster-form', params: { id: cluster.id } }),
-      },
-      {
-        text: 'Cluster entfernen',
-        style: 'destructive',
-        onPress: () => {
-          void remove(cluster.id).then(() => router.replace('/'));
-        },
-      },
-      { text: 'Abbrechen', style: 'cancel' },
-    ]);
-  };
+  const onAvatar = () => setSettingsOpen(true);
 
   return (
     <View style={styles.container}>
@@ -467,6 +454,13 @@ export default function DashboardScreen() {
         onClose={() => setSwitcherOpen(false)}
         activeCluster={cluster}
       />
+      <SettingsSheet
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        cluster={cluster}
+        onOpenNamespaces={() => setNsOpen(true)}
+      />
+      <NamespaceSheet visible={nsOpen} onClose={() => setNsOpen(false)} cluster={cluster} />
     </View>
   );
 }

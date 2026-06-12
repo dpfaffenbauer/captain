@@ -21,8 +21,10 @@ import {
   restartRollout,
   scaleResource,
 } from '../../../src/kube/client';
+import { startPortForward } from '../../../src/kube/portforward';
 import { summarizeResource, SummarySection } from '../../../src/kube/summarize';
 import { useClusters } from '../../../src/state/ClustersContext';
+import { hapticTap, hapticWarning } from '../../../src/util/haptics';
 import { ApiResourceType } from '../../../src/types';
 import { BackButton, Card, StatusDot } from '../../../src/ui/kit';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
@@ -260,6 +262,7 @@ export default function ResourceItemScreen() {
   };
 
   const handleDelete = () => {
+    hapticWarning();
     Alert.alert(
       `Delete ${type.kind}`,
       `Really delete "${params.name}"${namespace ? ` in ${namespace}` : ''}?`,
@@ -301,9 +304,61 @@ export default function ResourceItemScreen() {
 
   if (!cluster) return <EmptyState message="Cluster not found." />;
 
+  const firstContainer = ((manifest?.spec as any)?.containers ?? [])[0];
+
+  const handleForward = () => {
+    const defaultPort = firstContainer?.ports?.[0]?.containerPort ?? 80;
+    Alert.prompt(
+      'Port forward',
+      'Remote container port',
+      (value) => {
+        const remotePort = parseInt(value, 10);
+        if (Number.isNaN(remotePort) || remotePort <= 0 || !cluster || !namespace) return;
+        hapticTap();
+        startPortForward(cluster, namespace, params.name, remotePort)
+          .then((forward) => {
+            Alert.alert(
+              'Port forward active',
+              `localhost:${forward.localPort} → ${params.name}:${remotePort}`,
+              [
+                { text: 'OK' },
+                {
+                  text: 'Show forwards',
+                  onPress: () =>
+                    router.push({ pathname: '/cluster/[id]/forwards', params: { id: params.id } }),
+                },
+              ]
+            );
+          })
+          .catch((caught) =>
+            setError(caught instanceof Error ? caught.message : String(caught))
+          );
+      },
+      'plain-text',
+      String(defaultPort),
+      'number-pad'
+    );
+  };
+
   const actions: Array<{ key: string; label: string; icon: string; primary?: boolean; onPress: () => void }> = [];
   if (isPod && namespace) {
     actions.push({ key: 'logs', label: 'Logs', icon: '≣', primary: true, onPress: () => openLogs() });
+    actions.push({
+      key: 'exec',
+      label: 'Exec',
+      icon: '>_',
+      onPress: () =>
+        router.push({
+          pathname: '/cluster/[id]/exec',
+          params: {
+            id: params.id,
+            namespace,
+            name: params.name,
+            container: firstContainer?.name ?? '',
+          },
+        }),
+    });
+    actions.push({ key: 'forward', label: 'Forward', icon: '⇄', onPress: handleForward });
   }
   if (SCALABLE.has(typeKey) && canEdit) {
     actions.push({ key: 'scale', label: 'Scale', icon: '⇅', onPress: handleScale });
