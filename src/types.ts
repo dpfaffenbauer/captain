@@ -28,6 +28,22 @@ export type AuthConfig =
 
 export type AuthType = AuthConfig['type'];
 
+/**
+ * Where to reach a Prometheus instance inside the cluster. Captain queries it
+ * through the API-server service proxy, so no extra network exposure or auth
+ * is required beyond what the cluster connection already provides.
+ */
+export interface PrometheusConfig {
+  namespace: string;
+  /** Service name, e.g. "prometheus-k8s" or "prometheus-server". */
+  service: string;
+  port: number;
+  /** Set to 'https' when the service itself speaks TLS; defaults to http. */
+  scheme?: 'http' | 'https';
+  /** When true, Captain neither auto-discovers nor queries Prometheus. */
+  disabled?: boolean;
+}
+
 export interface ClusterConfig {
   id: string;
   name: string;
@@ -44,6 +60,8 @@ export interface ClusterConfig {
   clientP12?: string;
   clientP12Password?: string;
   auth: AuthConfig;
+  /** Resolved/auto-discovered Prometheus location for metrics and alerts. */
+  prometheus?: PrometheusConfig;
 }
 
 /** A resource type discovered from the API server. */

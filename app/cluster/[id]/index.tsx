@@ -17,9 +17,18 @@ import {
   listResources,
 } from '../../../src/kube/client';
 import { parseCpu, parseMemory, formatCores, formatGiB } from '../../../src/kube/quantity';
+import {
+  CLUSTER_CPU_QUERY,
+  CLUSTER_MEM_QUERY,
+  getFiringAlerts,
+  promRangeValues,
+  PromAlert,
+  resolvePrometheus,
+} from '../../../src/kube/prometheus';
+import { formatCpuUsage, formatMemoryUsage } from '../../../src/kube/metrics';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, ClusterConfig } from '../../../src/types';
-import { Card, HealthRing, StatusDot, UsageBar } from '../../../src/ui/kit';
+import { Card, HealthRing, Sparkline, StatusDot, UsageBar } from '../../../src/ui/kit';
 import { ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from '../../../src/ui/sheets';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
@@ -50,6 +59,37 @@ interface DashboardData {
   namespacesCount: number;
   attention: Attention[];
   events: ClusterEvent[];
+}
+
+interface PromData {
+  cpuSeries: number[];
+  memSeries: number[];
+  alerts: PromAlert[];
+}
+
+/**
+ * Resolves Prometheus (explicit or auto-discovered) and fetches the last hour
+ * of cluster CPU/memory plus firing alerts. Returns null when Prometheus is
+ * absent or the discovered service doesn't answer like Prometheus.
+ */
+async function loadPrometheus(
+  cluster: ClusterConfig
+): Promise<{ cfg: NonNullable<ClusterConfig['prometheus']>; data: PromData } | null> {
+  const cfg = await resolvePrometheus(cluster);
+  if (!cfg) return null;
+  const [cpuSeries, memSeries, alerts] = await Promise.all([
+    promRangeValues(cluster, cfg, CLUSTER_CPU_QUERY).catch(() => [] as number[]),
+    promRangeValues(cluster, cfg, CLUSTER_MEM_QUERY).catch(() => [] as number[]),
+    getFiringAlerts(cluster, cfg).catch(() => [] as PromAlert[]),
+  ]);
+  if (cpuSeries.length === 0 && memSeries.length === 0 && alerts.length === 0) {
+    return null;
+  }
+  return { cfg, data: { cpuSeries, memSeries, alerts } };
+}
+
+function severityTone(severity: string): 'crit' | 'warn' {
+  return severity === 'critical' || severity === 'error' ? 'crit' : 'warn';
 }
 
 function healthLabel(percent: number): string {
@@ -199,10 +239,11 @@ function StatCard({
 export default function DashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getById } = useClusters();
+  const { getById, addOrUpdate } = useClusters();
   const cluster = getById(id);
 
   const [data, setData] = useState<DashboardData | null>(null);
+  const [prom, setProm] = useState<PromData | null>(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -244,6 +285,29 @@ export default function DashboardScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const reloadProm = useCallback(async () => {
+    const current = getById(id);
+    if (!current) return;
+    try {
+      const result = await loadPrometheus(current);
+      setProm(result?.data ?? null);
+      // Persist the auto-discovered location so it sticks and stays editable.
+      if (result && !current.prometheus) {
+        void addOrUpdate({ ...current, prometheus: result.cfg });
+      }
+    } catch {
+      setProm(null);
+    }
+  }, [getById, id, addOrUpdate]);
+
+  // Prometheus is optional and slower to resolve, so it loads independently and
+  // augments the dashboard once ready. Keyed on cluster id so it doesn't re-run
+  // when persisting the discovered config flips the cluster object.
+  useEffect(() => {
+    void reloadProm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const healthPct = useMemo(() => {
     if (!data || data.podsTotal === 0) return 100;
@@ -295,6 +359,7 @@ export default function DashboardScreen() {
               onRefresh={() => {
                 setRefreshing(true);
                 void load();
+                void reloadProm();
               }}
               tintColor={colors.accent}
             />
@@ -377,6 +442,83 @@ export default function DashboardScreen() {
                 </View>
               ) : null}
             </Card>
+          ) : null}
+
+          {/* Prometheus trends */}
+          {prom && (prom.cpuSeries.length > 1 || prom.memSeries.length > 1) ? (
+            <Card style={{ gap: 14 }}>
+              <View style={styles.capRow}>
+                <Text style={styles.sectionInCard}>Trends · last hour</Text>
+                <Text style={styles.trendSource}>Prometheus</Text>
+              </View>
+              <View style={styles.trendRow}>
+                {prom.cpuSeries.length > 1 ? (
+                  <View style={styles.trendCell}>
+                    <Text style={styles.trendLabel}>CPU</Text>
+                    <Text style={styles.trendValue}>
+                      {formatCpuUsage(prom.cpuSeries[prom.cpuSeries.length - 1])}
+                      <Text style={styles.trendUnit}> cores</Text>
+                    </Text>
+                    <Sparkline values={prom.cpuSeries} color={colors.accent} width={140} />
+                  </View>
+                ) : null}
+                {prom.memSeries.length > 1 ? (
+                  <View style={styles.trendCell}>
+                    <Text style={styles.trendLabel}>Memory</Text>
+                    <Text style={styles.trendValue}>
+                      {formatMemoryUsage(prom.memSeries[prom.memSeries.length - 1])}
+                    </Text>
+                    <Sparkline values={prom.memSeries} color={colors.warning} width={140} />
+                  </View>
+                ) : null}
+              </View>
+            </Card>
+          ) : null}
+
+          {/* Firing alerts (Prometheus) */}
+          {prom && prom.alerts.length > 0 ? (
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionTitle}>Firing alerts</Text>
+                <View style={[styles.badge, { backgroundColor: `${colors.danger}26` }]}>
+                  <Text style={[styles.badgeText, { color: colors.dangerLight }]}>
+                    {prom.alerts.length}
+                  </Text>
+                </View>
+              </View>
+              {prom.alerts.slice(0, 6).map((alert, index) => {
+                const tone = severityTone(alert.severity) === 'crit' ? colors.danger : colors.warning;
+                const toneLight =
+                  severityTone(alert.severity) === 'crit' ? colors.dangerLight : colors.warningLight;
+                const detail =
+                  alert.summary ||
+                  [alert.namespace, alert.pod].filter(Boolean).join('/') ||
+                  alert.severity;
+                const canOpen = Boolean(alert.namespace && alert.pod);
+                return (
+                  <TouchableOpacity
+                    key={`${alert.name}-${index}`}
+                    disabled={!canOpen}
+                    onPress={() => canOpen && openPod(alert.namespace ?? '', alert.pod ?? '')}
+                  >
+                    <View style={[styles.attention, { borderColor: `${tone}40`, backgroundColor: `${tone}14` }]}>
+                      <View style={[styles.attentionIcon, { backgroundColor: `${tone}30` }]}>
+                        <StatusDot color={tone} size={10} />
+                      </View>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <Text style={styles.attentionTitle} numberOfLines={1}>
+                          {alert.name}
+                        </Text>
+                        <Text style={[styles.attentionDetail, { color: toneLight }]} numberOfLines={2}>
+                          {detail}
+                        </Text>
+                      </View>
+                      {canOpen ? <Text style={[styles.chevron, { color: `${tone}80` }]}>›</Text> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
           ) : null}
 
           {/* Needs attention */}
@@ -525,6 +667,12 @@ const styles = StyleSheet.create({
   capRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   capLabel: { color: 'rgba(242,245,250,0.55)', fontSize: 12 },
   capValue: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  trendSource: { color: colors.textFaint, fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 },
+  trendRow: { flexDirection: 'row', gap: 14 },
+  trendCell: { flex: 1, gap: 4 },
+  trendLabel: { color: 'rgba(242,245,250,0.55)', fontSize: 11.5, fontWeight: '600' },
+  trendValue: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  trendUnit: { color: colors.textDim, fontSize: 11, fontWeight: '600' },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
