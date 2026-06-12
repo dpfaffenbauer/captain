@@ -355,6 +355,74 @@ export async function restartRollout(
   });
 }
 
+/** Marks a node (un)schedulable like `kubectl cordon` / `uncordon`. */
+export async function setNodeUnschedulable(
+  cluster: ClusterConfig,
+  name: string,
+  unschedulable: boolean
+): Promise<void> {
+  await kubeRequest(cluster, `/api/v1/nodes/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ spec: { unschedulable: unschedulable ? true : null } }),
+    contentType: 'application/merge-patch+json',
+  });
+}
+
+export interface DrainResult {
+  evicted: number;
+  /** DaemonSet-managed, mirror, and already finished pods are left alone. */
+  skipped: number;
+  /** "namespace/pod: reason" for every eviction the API server refused. */
+  failures: string[];
+}
+
+/**
+ * Drains a node like `kubectl drain --ignore-daemonsets --delete-emptydir-data`:
+ * cordons it, then evicts every regular pod via the eviction subresource so
+ * PodDisruptionBudgets are honored (a refusal shows up under `failures`).
+ */
+export async function drainNode(cluster: ClusterConfig, name: string): Promise<DrainResult> {
+  await setNodeUnschedulable(cluster, name, true);
+  const body = await kubeRequestJson<{ items?: any[] }>(
+    cluster,
+    `/api/v1/pods?fieldSelector=${encodeURIComponent(`spec.nodeName=${name}`)}&limit=500`
+  );
+  const result: DrainResult = { evicted: 0, skipped: 0, failures: [] };
+  const evictions = (body.items ?? []).map(async (pod) => {
+    const podName: string = pod.metadata?.name ?? '';
+    const podNamespace: string = pod.metadata?.namespace ?? '';
+    const ownedByDaemonSet = (pod.metadata?.ownerReferences ?? []).some(
+      (ref: any) => ref.kind === 'DaemonSet'
+    );
+    const isMirror = pod.metadata?.annotations?.['kubernetes.io/config.mirror'] != null;
+    const finished = pod.status?.phase === 'Succeeded' || pod.status?.phase === 'Failed';
+    if (ownedByDaemonSet || isMirror || finished) {
+      result.skipped += 1;
+      return;
+    }
+    try {
+      await kubeRequest(
+        cluster,
+        `/api/v1/namespaces/${encodeURIComponent(podNamespace)}/pods/${encodeURIComponent(podName)}/eviction`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            apiVersion: 'policy/v1',
+            kind: 'Eviction',
+            metadata: { name: podName, namespace: podNamespace },
+          }),
+        }
+      );
+      result.evicted += 1;
+    } catch (caught) {
+      const reason = caught instanceof Error ? caught.message : String(caught);
+      result.failures.push(`${podNamespace}/${podName}: ${reason}`);
+    }
+  });
+  await Promise.all(evictions);
+  return result;
+}
+
 export interface ResourceEvent {
   type: string;
   reason: string;

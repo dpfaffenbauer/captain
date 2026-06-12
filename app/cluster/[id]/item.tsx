@@ -17,10 +17,12 @@ import {
   deleteResource,
   getResource,
   listDeploymentRevisions,
+  drainNode,
   listEventsFor,
   replaceResource,
   ResourceEvent,
   restartRollout,
+  setNodeUnschedulable,
   rollbackDeployment,
   scaleResource,
   setContainerImage,
@@ -164,6 +166,7 @@ export default function ResourceItemScreen() {
   const namespace = params.namespace || undefined;
   const typeKey = `${type.group}/${type.kind}`;
   const isPod = typeKey === '/Pod';
+  const isNode = typeKey === '/Node';
 
   const [manifest, setManifest] = useState<Record<string, unknown> | null>(null);
   const [events, setEvents] = useState<ResourceEvent[]>([]);
@@ -220,7 +223,9 @@ export default function ResourceItemScreen() {
           : undefined
     : typeKey === 'apps/Deployment' && (manifest?.spec as any)?.paused === true
       ? { label: 'Paused', color: colors.warning }
-      : undefined;
+      : isNode && (manifest?.spec as any)?.unschedulable === true
+        ? { label: 'Cordoned', color: colors.warning }
+        : undefined;
 
   const runAction = async (action: () => Promise<void>) => {
     if (!cluster) return;
@@ -373,6 +378,41 @@ export default function ResourceItemScreen() {
     ]);
   };
 
+  const nodeCordoned = (manifest?.spec as any)?.unschedulable === true;
+
+  const handleCordon = () => {
+    hapticTap();
+    void runAction(() => setNodeUnschedulable(cluster!, params.name, !nodeCordoned));
+  };
+
+  const handleDrain = () => {
+    hapticWarning();
+    Alert.alert(
+      'Drain node',
+      `Cordon "${params.name}" and evict all regular pods? DaemonSet and mirror pods stay; PodDisruptionBudgets are honored.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Drain',
+          style: 'destructive',
+          onPress: () =>
+            void runAction(async () => {
+              const result = await drainNode(cluster!, params.name);
+              const summary = `${result.evicted} evicted · ${result.skipped} skipped${
+                result.failures.length > 0 ? ` · ${result.failures.length} refused` : ''
+              }`;
+              Alert.alert(
+                'Drain finished',
+                result.failures.length > 0
+                  ? `${summary}\n\n${result.failures.slice(0, 5).join('\n')}`
+                  : summary
+              );
+            }),
+        },
+      ]
+    );
+  };
+
   const handleSuspendCron = () => {
     hapticTap();
     void runAction(() =>
@@ -511,6 +551,15 @@ export default function ResourceItemScreen() {
       icon: rolloutPaused ? '▶' : '❚❚',
       onPress: handlePauseResume,
     });
+  }
+  if (isNode && canEdit) {
+    actions.push({
+      key: 'cordon',
+      label: nodeCordoned ? 'Uncordon' : 'Cordon',
+      icon: nodeCordoned ? '▶' : '⊘',
+      onPress: handleCordon,
+    });
+    actions.push({ key: 'drain', label: 'Drain', icon: '⤓', onPress: handleDrain });
   }
   if (typeKey === 'batch/CronJob' && canEdit && namespace) {
     actions.push({ key: 'trigger', label: 'Run now', icon: '▶', onPress: handleTriggerCron });
