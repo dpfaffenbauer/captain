@@ -49,6 +49,11 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
 - **Related Resources**: Die Detailansicht verlinkt Owner (ownerReferences)
   und Kinder (Deployment → ReplicaSets/Pods, Service → Pods, Ingress →
   Services, PVC ↔ Volume/Pods, Pod → Node/PVCs) zum Durchnavigieren.
+- **Favoriten/Pins**: Jede Ressource lässt sich in der Detailansicht über den
+  Stern anheften; der Home-Screen zeigt einen „Pinned"-Bereich mit allen
+  angehefteten Objekten **über alle Cluster hinweg** — ein Tap springt direkt
+  zur Ressource, langes Drücken entfernt den Pin. Gespeichert im Keychain
+  (expo-secure-store), damit die Pins einen App-Neustart überleben.
 - **Multi-Cluster-Dashboard**: Der Home-Screen prüft alle Cluster parallel
   (Node-Readiness, Problem-Pods) und zeigt Ampel-Status plus Kurzzusammen-
   fassung pro Cluster.
