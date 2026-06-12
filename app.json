@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "at.pfaffenbauer.captain",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.at.pfaffenbauer.captain"]
+      },
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -40,6 +43,7 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-local-authentication",
+      "@bacons/apple-targets",
       [
         "expo-camera",
         {
