@@ -17,7 +17,6 @@ import { getForwards, subscribeForwards } from '../../../src/kube/portforward';
 import { namespaceLabel, useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType } from '../../../src/types';
-import { FloatingTabBar } from '../../../src/ui/FloatingTabBar';
 import { Card, Pill, SquircleIcon } from '../../../src/ui/kit';
 import { NamespaceSheet } from '../../../src/ui/sheets';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
@@ -159,7 +158,6 @@ export default function BrowseScreen() {
         </ScrollView>
       )}
 
-      <FloatingTabBar clusterId={id} active="browse" />
       <NamespaceSheet visible={nsOpen} onClose={() => setNsOpen(false)} cluster={cluster} />
     </View>
   );

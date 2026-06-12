@@ -10,7 +10,6 @@ import {
 import { ClusterEvent, listClusterEvents } from '../../../src/kube/client';
 import { useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
-import { FloatingTabBar } from '../../../src/ui/FloatingTabBar';
 import { Card, Pill, StatusDot } from '../../../src/ui/kit';
 import { EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { colors, spacing } from '../../../src/ui/theme';
@@ -136,8 +135,6 @@ export default function EventsScreen() {
           )}
         </ScrollView>
       )}
-
-      <FloatingTabBar clusterId={id} active="events" />
     </View>
   );
 }

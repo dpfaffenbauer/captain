@@ -19,7 +19,6 @@ import {
 import { parseCpu, parseMemory, formatCores, formatGiB } from '../../../src/kube/quantity';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, ClusterConfig } from '../../../src/types';
-import { FloatingTabBar } from '../../../src/ui/FloatingTabBar';
 import { Card, HealthRing, StatusDot, UsageBar } from '../../../src/ui/kit';
 import { ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from '../../../src/ui/sheets';
 import { colors, radius, spacing } from '../../../src/ui/theme';
@@ -448,7 +447,6 @@ export default function DashboardScreen() {
         </ScrollView>
       ) : null}
 
-      <FloatingTabBar clusterId={id} active="home" />
       <ClusterSwitcherSheet
         visible={switcherOpen}
         onClose={() => setSwitcherOpen(false)}
