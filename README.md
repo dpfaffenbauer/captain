@@ -13,6 +13,13 @@ unterstützt.
   (expo-secure-store).
 - **Alle Ressourcen-Typen**: dynamische Discovery über `/api/v1` und `/apis/…`
   — Pods, Deployments, CRDs, alles was der API-Server kennt.
+- **Kuratierte Übersicht** (à la Lens): auf-/zuklappbare Kategorien — Cluster
+  (Nodes, Namespaces, Events), Workloads (Pods, Deployments, StatefulSets,
+  DaemonSets, ReplicaSets, Jobs, CronJobs …), Config (Secrets, ConfigMaps,
+  Quotas, HPA, PDB, Webhooks …), Netzwerk (Services, Ingresses,
+  EndpointSlices, NetworkPolicies …), Storage (PVC, PV, StorageClasses),
+  Zugriffskontrolle (ServiceAccounts, RBAC) sowie **Custom Resources**
+  automatisch gruppiert nach API-Gruppe; alles Übrige unter „Sonstiges".
 - **Lesen, Bearbeiten, Löschen**: Listen mit Namespace-Filter, Pagination und
   Suche; Detailansicht als YAML; Bearbeiten im YAML-Editor (PUT/replace);
   Löschen mit Bestätigung.

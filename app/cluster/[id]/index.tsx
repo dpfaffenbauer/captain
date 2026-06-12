@@ -1,37 +1,53 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { categorizeResourceTypes, ResourceCategory } from '../../../src/kube/categories';
 import { discoverResourceTypes } from '../../../src/kube/client';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType } from '../../../src/types';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { colors, spacing } from '../../../src/ui/theme';
 
-type Row =
-  | { kind: 'header'; key: string; title: string }
-  | { kind: 'resource'; key: string; type: ApiResourceType };
+interface Section {
+  category: ResourceCategory;
+  collapsed: boolean;
+  data: ApiResourceType[];
+}
 
-export default function ResourceTypesScreen() {
+export default function ResourceCategoriesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getById } = useClusters();
   const cluster = getById(id);
 
-  const [types, setTypes] = useState<ApiResourceType[]>([]);
+  const [categories, setCategories] = useState<ResourceCategory[]>([]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!cluster) return;
-    setLoading(true);
     setError('');
     try {
-      setTypes(await discoverResourceTypes(cluster));
+      const types = await discoverResourceTypes(cluster);
+      const result = categorizeResourceTypes(types.filter((type) => type.verbs.includes('list')));
+      setCategories(result);
+      setCollapsed(new Set(result.filter((c) => c.collapsedByDefault).map((c) => c.key)));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [cluster]);
 
@@ -39,35 +55,39 @@ export default function ResourceTypesScreen() {
     void load();
   }, [load]);
 
-  const rows = useMemo<Row[]>(() => {
+  const sections = useMemo<Section[]>(() => {
     const query = filter.trim().toLowerCase();
-    const visible = types.filter(
-      (type) =>
-        type.verbs.includes('list') &&
-        (query === '' ||
-          type.kind.toLowerCase().includes(query) ||
-          type.plural.includes(query) ||
-          type.group.includes(query))
-    );
-    const byGroup = new Map<string, ApiResourceType[]>();
-    for (const type of visible) {
-      const groupName = type.group === '' ? 'core' : type.group;
-      const list = byGroup.get(groupName) ?? [];
-      list.push(type);
-      byGroup.set(groupName, list);
-    }
-    const groupNames = [...byGroup.keys()].sort((a, b) =>
-      a === 'core' ? -1 : b === 'core' ? 1 : a.localeCompare(b)
-    );
-    const result: Row[] = [];
-    for (const groupName of groupNames) {
-      result.push({ kind: 'header', key: `header:${groupName}`, title: groupName });
-      for (const type of byGroup.get(groupName)!) {
-        result.push({ kind: 'resource', key: `${groupName}/${type.version}/${type.plural}`, type });
-      }
-    }
-    return result;
-  }, [types, filter]);
+    return categories
+      .map((category) => {
+        const matching = query
+          ? category.types.filter(
+              (type) =>
+                type.kind.toLowerCase().includes(query) ||
+                type.plural.includes(query) ||
+                type.group.includes(query)
+            )
+          : category.types;
+        // While searching, ignore collapse state so results stay visible.
+        const isCollapsed = query === '' && collapsed.has(category.key);
+        return {
+          category,
+          collapsed: isCollapsed,
+          data: isCollapsed ? [] : matching,
+          matchCount: matching.length,
+        };
+      })
+      .filter((section) => (query ? section.matchCount > 0 : true))
+      .map(({ matchCount: _omitted, ...section }) => section);
+  }, [categories, collapsed, filter]);
+
+  const toggleSection = (key: string) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   if (!cluster) return <EmptyState message="Cluster nicht gefunden." />;
 
@@ -91,39 +111,59 @@ export default function ResourceTypesScreen() {
       ) : loading ? (
         <Loading />
       ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(row) => row.key}
-          ListEmptyComponent={<EmptyState message="Keine Ressourcen-Typen gefunden." />}
-          renderItem={({ item }) =>
-            item.kind === 'header' ? (
-              <Text style={styles.groupHeader}>{item.title}</Text>
-            ) : (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() =>
-                  router.push({
-                    pathname: '/cluster/[id]/list',
-                    params: {
-                      id,
-                      group: item.type.group,
-                      version: item.type.version,
-                      plural: item.type.plural,
-                      kind: item.type.kind,
-                      namespaced: item.type.namespaced ? '1' : '0',
-                      verbs: item.type.verbs.join(','),
-                    },
-                  })
-                }
-              >
-                <Text style={styles.kind}>{item.type.kind}</Text>
-                <Text style={styles.plural}>
-                  {item.type.plural} · {item.type.version}
-                  {item.type.namespaced ? '' : ' · clusterweit'}
-                </Text>
-              </TouchableOpacity>
-            )
+        <SectionList
+          sections={sections}
+          keyExtractor={(type) => `${type.group}/${type.version}/${type.plural}`}
+          stickySectionHeadersEnabled
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                void load();
+              }}
+              tintColor={colors.accent}
+            />
           }
+          ListEmptyComponent={<EmptyState message="Keine Ressourcen-Typen gefunden." />}
+          renderSectionHeader={({ section }) => (
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection(section.category.key)}
+            >
+              <Text style={styles.sectionIcon}>{section.category.icon}</Text>
+              <Text style={styles.sectionTitle}>{section.category.title}</Text>
+              <Text style={styles.sectionCount}>{section.category.types.length}</Text>
+              <Text style={styles.sectionChevron}>{section.collapsed ? '›' : '⌄'}</Text>
+            </TouchableOpacity>
+          )}
+          renderItem={({ item, section }) => (
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() =>
+                router.push({
+                  pathname: '/cluster/[id]/list',
+                  params: {
+                    id,
+                    group: item.group,
+                    version: item.version,
+                    plural: item.plural,
+                    kind: item.kind,
+                    namespaced: item.namespaced ? '1' : '0',
+                    verbs: item.verbs.join(','),
+                  },
+                })
+              }
+            >
+              <Text style={styles.kind}>{item.kind}</Text>
+              <Text style={styles.detail}>
+                {section.category.key === 'custom' || section.category.key === 'other'
+                  ? `${item.group || 'core'} · ${item.version}`
+                  : `${item.plural} · ${item.version}`}
+                {item.namespaced ? '' : ' · clusterweit'}
+              </Text>
+            </TouchableOpacity>
+          )}
         />
       )}
     </View>
@@ -144,22 +184,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   errorWrap: { padding: spacing.lg },
-  groupHeader: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xs,
-  },
-  row: {
-    backgroundColor: colors.surface,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
     borderBottomColor: colors.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  kind: { color: colors.text, fontSize: 16, fontWeight: '500' },
-  plural: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  sectionIcon: { fontSize: 15, marginRight: spacing.sm },
+  sectionTitle: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },
+  sectionCount: { color: colors.textDim, fontSize: 13, marginRight: spacing.md },
+  sectionChevron: { color: colors.textDim, fontSize: 17, width: 16, textAlign: 'center' },
+  row: {
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingLeft: spacing.xl + spacing.sm,
+    paddingRight: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  kind: { color: colors.text, fontSize: 15, fontWeight: '500' },
+  detail: { color: colors.textDim, fontSize: 12, marginTop: 2 },
 });
