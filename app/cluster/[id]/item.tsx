@@ -28,6 +28,12 @@ import {
   triggerCronJob,
 } from '../../../src/kube/client';
 import { startPortForward } from '../../../src/kube/portforward';
+import {
+  ChildGroup,
+  describeChild,
+  listOwnedResources,
+  typeForOwnerRef,
+} from '../../../src/kube/related';
 import { summarizeResource, SummarySection } from '../../../src/kube/summarize';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { hapticTap, hapticWarning } from '../../../src/util/haptics';
@@ -164,6 +170,7 @@ export default function ResourceItemScreen() {
 
   const [manifest, setManifest] = useState<Record<string, unknown> | null>(null);
   const [events, setEvents] = useState<ResourceEvent[]>([]);
+  const [children, setChildren] = useState<ChildGroup[]>([]);
   const [tab, setTab] = useState<'overview' | 'yaml'>('overview');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -182,15 +189,26 @@ export default function ResourceItemScreen() {
   );
   const crash = useMemo(() => (isPod ? detectCrash(manifest) : null), [isPod, manifest]);
 
+  /** ownerReferences resolved to navigable types (Pod → ReplicaSet → Deployment …). */
+  const owners = useMemo(() => {
+    const refs = (((manifest as any)?.metadata?.ownerReferences ?? []) as any[]);
+    return refs.map((ref) => ({ ref, ownerType: typeForOwnerRef(ref, type.namespaced) }));
+  }, [manifest, type.namespaced]);
+  const nodeName = isPod ? ((manifest?.spec as any)?.nodeName as string | undefined) : undefined;
+
   const load = useCallback(async () => {
     if (!cluster) return;
     setLoading(true);
     setError('');
     try {
-      setManifest(await getResource(cluster, type, params.name, namespace));
+      const fetched = await getResource(cluster, type, params.name, namespace);
+      setManifest(fetched);
       listEventsFor(cluster, type.kind, params.name, namespace)
         .then(setEvents)
         .catch(() => setEvents([]));
+      listOwnedResources(cluster, type, fetched)
+        .then(setChildren)
+        .catch(() => setChildren([]));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -387,6 +405,24 @@ export default function ResourceItemScreen() {
         },
       ]
     );
+  };
+
+  const openRelated = (relType: ApiResourceType, name: string, relNamespace?: string) => {
+    hapticTap();
+    router.push({
+      pathname: '/cluster/[id]/item',
+      params: {
+        id: params.id,
+        group: relType.group,
+        version: relType.version,
+        plural: relType.plural,
+        kind: relType.kind,
+        namespaced: relType.namespaced ? '1' : '0',
+        verbs: relType.verbs.join(','),
+        name,
+        namespace: relType.namespaced ? (relNamespace ?? '') : '',
+      },
+    });
   };
 
   const openLogs = (previous?: boolean) => {
@@ -606,7 +642,85 @@ export default function ResourceItemScreen() {
             </Card>
           ) : (
             <>
+              {/* Parent resources (ownerReferences, plus the node for pods) */}
+              {owners.length > 0 || nodeName ? (
+                <Card style={styles.summaryCard}>
+                  <Text style={styles.cardTitle}>Übergeordnet</Text>
+                  {owners.map(({ ref, ownerType }, index) => (
+                    <TouchableOpacity
+                      key={`${ref.kind}-${ref.name}`}
+                      style={[styles.relatedRow, index > 0 && styles.kvDivider]}
+                      disabled={!ownerType}
+                      onPress={() => ownerType && openRelated(ownerType, ref.name, namespace)}
+                    >
+                      <View style={styles.relatedText}>
+                        <Text style={styles.relatedName} numberOfLines={1}>
+                          {ref.name}
+                        </Text>
+                        <Text style={styles.relatedDetail}>{ref.kind}</Text>
+                      </View>
+                      {ownerType ? <Text style={styles.relatedChevron}>›</Text> : null}
+                    </TouchableOpacity>
+                  ))}
+                  {nodeName ? (
+                    <TouchableOpacity
+                      style={[styles.relatedRow, owners.length > 0 && styles.kvDivider]}
+                      onPress={() =>
+                        openRelated(typeForOwnerRef({ apiVersion: 'v1', kind: 'Node' }, false)!, nodeName)
+                      }
+                    >
+                      <View style={styles.relatedText}>
+                        <Text style={styles.relatedName} numberOfLines={1}>
+                          {nodeName}
+                        </Text>
+                        <Text style={styles.relatedDetail}>Node</Text>
+                      </View>
+                      <Text style={styles.relatedChevron}>›</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </Card>
+              ) : null}
+
               <SummaryCards sections={sections} />
+
+              {/* Child resources owned by this one (ReplicaSets, Pods, Jobs …) */}
+              {children
+                .filter((group) => group.items.length > 0)
+                .map((group) => (
+                  <Card key={group.type.kind} style={styles.summaryCard}>
+                    <Text style={styles.cardTitle}>
+                      {group.type.kind}s ({group.items.length})
+                    </Text>
+                    {group.items.slice(0, 25).map((item, index) => {
+                      const info = describeChild(group.type, item.raw);
+                      return (
+                        <TouchableOpacity
+                          key={item.name}
+                          style={[styles.relatedRow, index > 0 && styles.kvDivider]}
+                          onPress={() => openRelated(group.type, item.name, item.namespace)}
+                        >
+                          {info.health ? (
+                            <StatusDot color={STATUS_COLORS[info.health]} size={8} />
+                          ) : null}
+                          <View style={styles.relatedText}>
+                            <Text style={styles.relatedName} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            {info.detail ? (
+                              <Text style={styles.relatedDetail}>{info.detail}</Text>
+                            ) : null}
+                          </View>
+                          <Text style={styles.relatedAge}>{ageOf(item.creationTimestamp)}</Text>
+                          <Text style={styles.relatedChevron}>›</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {group.items.length > 25 ? (
+                      <Text style={styles.relatedMore}>+{group.items.length - 25} weitere</Text>
+                    ) : null}
+                  </Card>
+                ))}
+
               {events.length > 0 ? (
                 <Card style={styles.summaryCard}>
                   <Text style={styles.cardTitle}>Events</Text>
@@ -718,6 +832,13 @@ const styles = StyleSheet.create({
   kvLabel: { color: colors.textDim, fontSize: 12.5, flexShrink: 1 },
   kvValue: { color: colors.text, fontSize: 12.5, flex: 1 },
   kvValueMono: { fontFamily: 'Menlo', fontSize: 11.5, color: colors.mono },
+  relatedRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9 },
+  relatedText: { flex: 1, minWidth: 0, gap: 2 },
+  relatedName: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  relatedDetail: { color: colors.textDim, fontSize: 11.5 },
+  relatedAge: { color: colors.textFaint, fontSize: 10.5 },
+  relatedChevron: { color: 'rgba(242,245,250,0.22)', fontSize: 18, fontWeight: '600' },
+  relatedMore: { color: colors.textFaint, fontSize: 11.5, paddingTop: 8 },
   eventRow: { paddingVertical: 7 },
   eventMessage: { color: colors.text, fontSize: 12.5, marginTop: 2, marginLeft: 14, lineHeight: 18 },
   yamlCard: { borderRadius: radius.card, backgroundColor: colors.backgroundDeep },
