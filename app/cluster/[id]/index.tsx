@@ -486,6 +486,12 @@ export default function DashboardScreen() {
                     {prom.alerts.length}
                   </Text>
                 </View>
+                <View style={{ flex: 1 }} />
+                {prom.alerts.length > 6 ? (
+                  <TouchableOpacity onPress={() => router.push(`/cluster/${id}/alerts` as never)}>
+                    <Text style={styles.viewAll}>View all</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
               {prom.alerts.slice(0, 6).map((alert, index) => {
                 const tone = severityTone(alert.severity) === 'crit' ? colors.danger : colors.warning;
