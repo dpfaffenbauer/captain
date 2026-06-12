@@ -197,7 +197,12 @@ export default function ClusterFormScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
         {error ? <ErrorBox message={error} /> : null}
 
         <Field label="Name" value={name} onChangeText={setName} placeholder="Mein Cluster" />

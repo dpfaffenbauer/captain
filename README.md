@@ -35,7 +35,8 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
   - **Azure AKS**: Microsoft Entra ID OAuth 2.0 (PKCE) gegen die
     AKS-AAD-Server-App.
   - **Bearer-Token**: z. B. ServiceAccount-Tokens.
-  - **Client-Zertifikate (mTLS)**: PKCS#12, nativ über URLSession.
+  - **Client-Zertifikate (mTLS)**: PEM-Zertifikat + Key direkt aus der
+    Kubeconfig (RSA und EC), nativ über URLSession; alternativ PKCS#12.
 - **Kubeconfig-Import**: YAML einfügen, Kontexte auswählen, fertig. Exec-Plugins
   (`aws`, `gke-gcloud-auth-plugin`, `kubelogin`) werden erkannt und auf die
   passende native Auth-Methode gemappt.
@@ -80,7 +81,7 @@ src/
                               metrics-server + Prometheus (prometheus.ts)
   state/, storage/, ui/, util/
 modules/kube-http/            Natives iOS-Modul (Swift): TLS mit eigener CA,
-                              insecure-skip-verify, mTLS via PKCS#12
+                              insecure-skip-verify, mTLS via PEM oder PKCS#12
 ```
 
 ## Setup
@@ -128,7 +129,7 @@ Captain erzeugt das Token on-device per SigV4 (presigned
 ### Google GKE
 
 1. In der Google Cloud Console einen **OAuth-Client vom Typ iOS** anlegen
-   (Bundle-ID: `gmbh.cors.captain`).
+   (Bundle-ID: `at.pfaffenbauer.captain`).
 2. Client-ID im Formular eintragen und „Mit Google anmelden".
 3. Der Google-Account braucht z. B. `roles/container.developer`.
 4. Server-URL und CA: `gcloud container clusters describe <cluster>`
@@ -151,7 +152,12 @@ Voraussetzung: AKS-Cluster mit Entra-ID-Integration (managed AAD).
 
 ### Client-Zertifikate (mTLS)
 
-Kubeconfig-PEMs in PKCS#12 konvertieren und base64-kodiert einfügen:
+`client-certificate-data` und `client-key-data` aus der Kubeconfig direkt in
+die Formularfelder einfügen (base64 oder PEM) — der Kubeconfig-Import
+übernimmt beides automatisch. Unterstützt werden RSA- und EC-Keys
+(PKCS#1, SEC1, unverschlüsseltes PKCS#8).
+
+Alternativ kann weiterhin ein PKCS#12-Bundle hinterlegt werden:
 
 ```sh
 openssl pkcs12 -export -in client.crt -inkey client.key -out client.p12 -password pass:captain

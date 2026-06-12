@@ -1,6 +1,14 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ImportedContext, parseKubeconfig } from '../src/kube/kubeconfig';
 import { useClusters } from '../src/state/ClustersContext';
 import { Button, ErrorBox, Field } from '../src/ui/components';
@@ -45,51 +53,61 @@ export default function KubeconfigImportScreen() {
   };
 
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-      {error ? <ErrorBox message={error} /> : null}
-      <Field
-        label="Kubeconfig (YAML einfügen)"
-        value={text}
-        onChangeText={setText}
-        placeholder="apiVersion: v1&#10;kind: Config&#10;clusters: …"
-        multiline
-        style={styles.editor}
-      />
-      <Button title="Kontexte lesen" variant="secondary" onPress={handleParse} disabled={!text.trim()} />
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
+        {error ? <ErrorBox message={error} /> : null}
+        <Field
+          label="Kubeconfig (YAML einfügen)"
+          value={text}
+          onChangeText={setText}
+          placeholder="apiVersion: v1&#10;kind: Config&#10;clusters: …"
+          multiline
+          style={styles.editor}
+        />
+        <Button title="Kontexte lesen" variant="secondary" onPress={handleParse} disabled={!text.trim()} />
 
-      {contexts.map((entry) => (
-        <TouchableOpacity
-          key={entry.contextName}
-          style={styles.contextRow}
-          onPress={() => toggle(entry.contextName)}
-        >
-          <View
-            style={[styles.checkbox, selected.has(entry.contextName) && styles.checkboxChecked]}
-          />
-          <View style={styles.contextText}>
-            <Text style={styles.contextName}>{entry.contextName}</Text>
-            <Text style={styles.contextServer} numberOfLines={1}>
-              {entry.cluster.server}
-            </Text>
-            {entry.warnings.map((warning) => (
-              <Text key={warning} style={styles.warning}>
-                ⚠ {warning}
+        {contexts.map((entry) => (
+          <TouchableOpacity
+            key={entry.contextName}
+            style={styles.contextRow}
+            onPress={() => toggle(entry.contextName)}
+          >
+            <View
+              style={[styles.checkbox, selected.has(entry.contextName) && styles.checkboxChecked]}
+            />
+            <View style={styles.contextText}>
+              <Text style={styles.contextName}>{entry.contextName}</Text>
+              <Text style={styles.contextServer} numberOfLines={1}>
+                {entry.cluster.server}
               </Text>
-            ))}
-          </View>
-        </TouchableOpacity>
-      ))}
+              {entry.warnings.map((warning) => (
+                <Text key={warning} style={styles.warning}>
+                  ⚠ {warning}
+                </Text>
+              ))}
+            </View>
+          </TouchableOpacity>
+        ))}
 
-      {contexts.length > 0 && (
-        <View style={styles.actions}>
-          <Button
-            title={`${selected.size} Cluster importieren`}
-            onPress={() => void handleImport()}
-            disabled={selected.size === 0}
-          />
-        </View>
-      )}
-    </ScrollView>
+        {contexts.length > 0 && (
+          <View style={styles.actions}>
+            <Button
+              title={`${selected.size} Cluster importieren`}
+              onPress={() => void handleImport()}
+              disabled={selected.size === 0}
+            />
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
