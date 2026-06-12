@@ -561,6 +561,131 @@ final class KubeExecRunner: NSObject, URLSessionWebSocketDelegate {
   }
 }
 
+// MARK: - Interactive exec session (PTY shell over the v4 channel protocol)
+
+/// Keeps a `kubectl exec -it`-style WebSocket open: stdin frames go out on
+/// channel 0, stdout/stderr arrive as events until the socket closes.
+final class KubeExecSession: NSObject, URLSessionWebSocketDelegate {
+  let id: String
+  private let trust: KubeTrustDelegate
+  private let request: URLRequest
+  private let onOutput: (Int, String) -> Void
+  private let onClosed: (String?) -> Void
+
+  private var session: URLSession!
+  private var task: URLSessionWebSocketTask!
+  private var finished = false
+  private let queue = DispatchQueue(label: "kube.exec.session")
+
+  init(
+    id: String,
+    request: URLRequest,
+    trust: KubeTrustDelegate,
+    onOutput: @escaping (Int, String) -> Void,
+    onClosed: @escaping (String?) -> Void
+  ) {
+    self.id = id
+    self.request = request
+    self.trust = trust
+    self.onOutput = onOutput
+    self.onClosed = onClosed
+    super.init()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = 60 * 60
+    configuration.timeoutIntervalForResource = 60 * 60 * 24
+    session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+    task = session.webSocketTask(with: request)
+  }
+
+  func start() {
+    task.resume()
+    receive()
+  }
+
+  func send(_ text: String) {
+    var framed = Data([0]) // channel 0 = stdin
+    framed.append(text.data(using: .utf8) ?? Data())
+    task.send(.data(framed)) { _ in }
+  }
+
+  func stop() {
+    finish(failure: nil)
+  }
+
+  private func receive() {
+    task.receive { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .failure:
+        // Socket closed/errored — finalization handled by the delegate methods.
+        return
+      case .success(let message):
+        var data: Data
+        switch message {
+        case .data(let d): data = d
+        case .string(let s): data = s.data(using: .utf8) ?? Data()
+        @unknown default: data = Data()
+        }
+        if data.count > 1 {
+          let channel = Int(data[data.startIndex])
+          let payload = data.dropFirst()
+          // Lossy decode: a PTY stream may split multi-byte chars at frame
+          // boundaries; a replacement char beats stalling the terminal.
+          let text = String(decoding: payload, as: UTF8.self)
+          if channel == 1 || channel == 2 {
+            self.onOutput(channel, text)
+          }
+        }
+        self.receive()
+      }
+    }
+  }
+
+  private func finish(failure: String?) {
+    queue.async {
+      if self.finished { return }
+      self.finished = true
+      self.task.cancel(with: .normalClosure, reason: nil)
+      self.session.finishTasksAndInvalidate()
+      self.onClosed(failure)
+    }
+  }
+
+  // MARK: URLSession delegates
+
+  func urlSession(
+    _ session: URLSession,
+    didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+  ) {
+    trust.urlSession(session, didReceive: challenge, completionHandler: completionHandler)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    webSocketTask: URLSessionWebSocketTask,
+    didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
+    reason: Data?
+  ) {
+    queue.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+      self?.finish(failure: nil)
+    }
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    var failure: String? = nil
+    if let reason = trust.trustFailureReason {
+      failure = reason
+    } else if let http = task.response as? HTTPURLResponse, http.statusCode >= 400 {
+      failure = "HTTP \(http.statusCode) — the API server rejected the exec request (RBAC: pods/exec?)."
+    } else if let error = error as NSError?, error.code != NSURLErrorCancelled {
+      let hint = trust.clientCertHint.map { " (\($0))" } ?? ""
+      failure = error.localizedDescription + hint
+    }
+    finish(failure: failure)
+  }
+}
+
 // MARK: - Streaming request session (log follow, watch)
 
 /// Long-lived HTTP request that surfaces response chunks as they arrive.
@@ -813,11 +938,12 @@ final class KubePortForwardSession {
 public class KubeHttpModule: Module {
   private var forwards: [String: KubePortForwardSession] = [:]
   private var streams: [String: KubeStreamSession] = [:]
+  private var execSessions: [String: KubeExecSession] = [:]
 
   public func definition() -> ModuleDefinition {
     Name("KubeHttp")
 
-    Events("kubeStreamChunk", "kubeStreamEnd")
+    Events("kubeStreamChunk", "kubeStreamEnd", "kubeExecOutput", "kubeExecClosed")
 
     AsyncFunction("request") { (options: KubeRequestOptions, promise: Promise) in
       guard let url = URL(string: options.url) else {
@@ -901,6 +1027,56 @@ public class KubeHttpModule: Module {
 
       let runner = KubeExecRunner(request: request, trust: trust, promise: promise)
       runner.start(timeoutMs: options.timeoutMs)
+    }
+
+    AsyncFunction("execStart") { (options: KubeExecOptions, promise: Promise) in
+      guard let url = URL(string: options.url) else {
+        promise.reject("ERR_KUBE_URL", "Invalid URL: \(options.url)")
+        return
+      }
+      let trust: KubeTrustDelegate
+      do {
+        trust = try kubeMakeTrustDelegate(tls: KubeTlsOptions(
+          caPem: options.caPem, insecure: options.insecure,
+          clientCertPem: options.clientCertPem, clientKeyPem: options.clientKeyPem,
+          pkcs12: options.pkcs12, pkcs12Password: options.pkcs12Password
+        ))
+      } catch {
+        promise.reject("ERR_KUBE_TLS", error.localizedDescription)
+        return
+      }
+
+      var request = URLRequest(url: url)
+      for (key, value) in options.headers {
+        request.setValue(value, forHTTPHeaderField: key)
+      }
+      request.setValue("v4.channel.k8s.io", forHTTPHeaderField: "Sec-WebSocket-Protocol")
+
+      let id = UUID().uuidString
+      let session = KubeExecSession(
+        id: id,
+        request: request,
+        trust: trust,
+        onOutput: { [weak self] channel, text in
+          self?.sendEvent("kubeExecOutput", ["id": id, "channel": channel, "data": text])
+        },
+        onClosed: { [weak self] failure in
+          self?.execSessions.removeValue(forKey: id)
+          self?.sendEvent("kubeExecClosed", ["id": id, "error": failure ?? ""])
+        }
+      )
+      execSessions[id] = session
+      session.start()
+      promise.resolve(id)
+    }
+
+    Function("execSend") { (id: String, data: String) in
+      self.execSessions[id]?.send(data)
+    }
+
+    Function("execStop") { (id: String) in
+      self.execSessions[id]?.stop()
+      self.execSessions.removeValue(forKey: id)
     }
 
     AsyncFunction("streamStart") { (options: KubeStreamOptions, promise: Promise) in
@@ -1025,6 +1201,10 @@ public class KubeHttpModule: Module {
         stream.stop()
       }
       self.streams.removeAll()
+      for (_, session) in self.execSessions {
+        session.stop()
+      }
+      self.execSessions.removeAll()
     }
   }
 }

@@ -81,9 +81,37 @@ interface KubeStreamEndEvent {
   status: number;
 }
 
+interface KubeExecOutputEvent {
+  id: string;
+  /** 1 = stdout, 2 = stderr. */
+  channel: number;
+  data: string;
+}
+
+interface KubeExecClosedEvent {
+  id: string;
+  error: string;
+}
+
+export interface NativeExecSessionHandlers {
+  onOutput: (data: string, isStderr: boolean) => void;
+  /** Called once when the socket closes; `error` is undefined on a clean end. */
+  onClosed: (error?: string) => void;
+}
+
+export interface NativeExecSessionHandle {
+  id: string;
+  /** Writes to the container's stdin (channel 0). */
+  send(data: string): void;
+  stop(): void;
+}
+
 interface KubeHttpNativeModule {
   request(options: NativeRequestOptions): Promise<NativeResponse>;
   exec(options: NativeExecOptions): Promise<NativeExecResult>;
+  execStart(options: NativeExecOptions): Promise<string>;
+  execSend(id: string, data: string): void;
+  execStop(id: string): void;
   streamStart(options: NativeStreamOptions): Promise<string>;
   streamStop(id: string): void;
   portForwardStart(options: NativePortForwardOptions): Promise<NativePortForwardHandle>;
@@ -181,6 +209,68 @@ export async function nativeStreamStart(
       // but a deliberate stop should not invoke onEnd.
       streamHandlers.delete(id);
       module.streamStop(id);
+    },
+  };
+}
+
+const execHandlers = new Map<string, NativeExecSessionHandlers>();
+/** Output that arrived before execStart() resolved and the handler was registered. */
+const earlyExecEvents = new Map<string, { outputs: KubeExecOutputEvent[]; closed?: string | null }>();
+let execListenersAttached = false;
+
+function attachExecListeners(module: KubeHttpNativeModule) {
+  if (execListenersAttached) return;
+  execListenersAttached = true;
+  module.addListener<KubeExecOutputEvent>('kubeExecOutput', (event) => {
+    const handlers = execHandlers.get(event.id);
+    if (handlers) {
+      handlers.onOutput(event.data, event.channel === 2);
+      return;
+    }
+    const early = earlyExecEvents.get(event.id) ?? { outputs: [] };
+    early.outputs.push(event);
+    earlyExecEvents.set(event.id, early);
+  });
+  module.addListener<KubeExecClosedEvent>('kubeExecClosed', (event) => {
+    const handlers = execHandlers.get(event.id);
+    if (handlers) {
+      execHandlers.delete(event.id);
+      handlers.onClosed(event.error || undefined);
+      return;
+    }
+    const early = earlyExecEvents.get(event.id) ?? { outputs: [] };
+    early.closed = event.error || null;
+    earlyExecEvents.set(event.id, early);
+  });
+}
+
+/** Opens an interactive exec session (stdin=true&tty=true in the URL). */
+export async function nativeExecSessionStart(
+  options: NativeExecOptions,
+  handlers: NativeExecSessionHandlers
+): Promise<NativeExecSessionHandle> {
+  const module = requireNative();
+  attachExecListeners(module);
+  const id = await module.execStart(options);
+  execHandlers.set(id, handlers);
+  const early = earlyExecEvents.get(id);
+  if (early) {
+    earlyExecEvents.delete(id);
+    for (const event of early.outputs) handlers.onOutput(event.data, event.channel === 2);
+    if (early.closed !== undefined) {
+      execHandlers.delete(id);
+      handlers.onClosed(early.closed ?? undefined);
+    }
+  }
+  return {
+    id,
+    send(data: string) {
+      module.execSend(id, data);
+    },
+    stop() {
+      // Detach first: a deliberate stop should not invoke onClosed.
+      execHandlers.delete(id);
+      module.execStop(id);
     },
   };
 }

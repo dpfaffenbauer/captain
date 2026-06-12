@@ -1,4 +1,9 @@
-import { isNativeTransportAvailable, nativeExec } from '../../modules/kube-http';
+import {
+  isNativeTransportAvailable,
+  nativeExec,
+  NativeExecSessionHandle,
+  nativeExecSessionStart,
+} from '../../modules/kube-http';
 import { getBearerToken } from '../auth/tokens';
 import { ClusterConfig } from '../types';
 import { tlsOptionsOf } from './transport';
@@ -70,4 +75,67 @@ export async function execCommand(
 
   const output = [result.stdout, result.stderr].filter(Boolean).join('').replace(/\n$/, '');
   return { output, failure };
+}
+
+export interface ShellSession {
+  /** Writes a line (plus newline) to the shell's stdin. */
+  sendLine(line: string): void;
+  stop(): void;
+}
+
+export interface ShellHandlers {
+  onOutput: (text: string) => void;
+  /** Called once when the session ends; `failure` is undefined on a clean exit. */
+  onClosed: (failure?: string) => void;
+}
+
+/**
+ * Opens an interactive shell in the container (`kubectl exec -it`): the
+ * WebSocket stays open with tty=true, so the PTY echoes input and merges
+ * stderr into stdout. One session per screen; stop() on unmount.
+ */
+export async function startShellSession(
+  cluster: ClusterConfig,
+  namespace: string,
+  pod: string,
+  container: string | undefined,
+  handlers: ShellHandlers
+): Promise<ShellSession> {
+  if (!isNativeTransportAvailable()) {
+    throw new Error('Exec requires the development build (native KubeHttp module).');
+  }
+  const params = new URLSearchParams();
+  params.append('command', '/bin/sh');
+  if (container) params.set('container', container);
+  params.set('stdin', 'true');
+  params.set('stdout', 'true');
+  params.set('stderr', 'false');
+  params.set('tty', 'true');
+
+  const headers: Record<string, string> = {};
+  const token = await getBearerToken(cluster);
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const session: NativeExecSessionHandle = await nativeExecSessionStart(
+    {
+      url: wsUrl(
+        cluster,
+        `/api/v1/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(pod)}/exec?${params.toString()}`
+      ),
+      headers,
+      ...tlsOptionsOf(cluster),
+    },
+    {
+      onOutput: (data) => handlers.onOutput(data),
+      onClosed: handlers.onClosed,
+    }
+  );
+  return {
+    sendLine(line: string) {
+      session.send(`${line}\n`);
+    },
+    stop() {
+      session.stop();
+    },
+  };
 }
