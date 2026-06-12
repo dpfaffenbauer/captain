@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Captain",
+    "slug": "captain",
+    "version": "1.0.0",
+    "scheme": "captain",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "gmbh.cors.captain",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSFaceIDUsageDescription": "Captain schützt gespeicherte Cluster-Zugangsdaten mit Face ID."
+      }
+    },
+    "android": {
+      "package": "gmbh.cors.captain",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Captain nutzt die Kamera, um Kubeconfig-QR-Codes zu scannen."
+        }
+      ]
+    ]
+  }
+}
