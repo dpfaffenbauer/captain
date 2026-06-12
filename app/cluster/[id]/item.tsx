@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import {
+  applyResource,
   deleteResource,
   getResource,
   listDeploymentRevisions,
@@ -28,6 +29,8 @@ import {
   triggerCronJob,
 } from '../../../src/kube/client';
 import { startPortForward } from '../../../src/kube/portforward';
+import { KubeApiError } from '../../../src/kube/transport';
+import { DiffLine, diffLines } from '../../../src/util/diff';
 import { summarizeResource, SummarySection } from '../../../src/kube/summarize';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { hapticTap, hapticWarning } from '../../../src/util/haptics';
@@ -167,6 +170,7 @@ export default function ResourceItemScreen() {
   const [tab, setTab] = useState<'overview' | 'yaml'>('overview');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [diff, setDiff] = useState<DiffLine[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -232,13 +236,41 @@ export default function ResourceItemScreen() {
     }
   };
 
-  const handleSave = async () => {
-    await runAction(async () => {
+  /** Save step 1: validate the draft and show what would change. */
+  const handleReview = () => {
+    setError('');
+    try {
       const parsed = yaml.load(draft);
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('The YAML document is empty or invalid.');
       }
-      await replaceResource(cluster!, type, params.name, parsed as Record<string, unknown>, namespace);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      return;
+    }
+    const changes = diffLines(yamlText, draft);
+    if (!changes.some((line) => line.type !== 'same')) {
+      setEditing(false);
+      return;
+    }
+    setDiff(changes);
+  };
+
+  /** Save step 2: server-side apply — immune to the PUT 409 conflict race. */
+  const handleApply = async () => {
+    await runAction(async () => {
+      const parsed = yaml.load(draft) as Record<string, unknown>;
+      try {
+        await applyResource(cluster!, type, params.name, parsed, namespace);
+      } catch (caught) {
+        // Some aggregated APIs do not support server-side apply; fall back to PUT.
+        if (caught instanceof KubeApiError && caught.status === 415) {
+          await replaceResource(cluster!, type, params.name, parsed, namespace);
+        } else {
+          throw caught;
+        }
+      }
+      setDiff(null);
       setEditing(false);
     });
   };
@@ -535,6 +567,46 @@ export default function ResourceItemScreen() {
 
       {loading ? (
         <Loading />
+      ) : editing && diff ? (
+        <>
+          {error ? (
+            <View style={styles.errorWrap}>
+              <ErrorBox message={error} />
+            </View>
+          ) : null}
+          <Text style={styles.diffSummary}>
+            Review changes ·{' '}
+            <Text style={{ color: colors.success }}>
+              +{diff.filter((line) => line.type === 'add').length}
+            </Text>{' '}
+            <Text style={{ color: colors.danger }}>
+              −{diff.filter((line) => line.type === 'del').length}
+            </Text>
+          </Text>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.diffScroll}>
+            {diff.map((line, index) =>
+              line.type === 'same' ? (
+                <Text key={index} style={styles.diffLine}>
+                  {`  ${line.text}` || ' '}
+                </Text>
+              ) : (
+                <Text
+                  key={index}
+                  style={[
+                    styles.diffLine,
+                    line.type === 'add' ? styles.diffAdd : styles.diffDel,
+                  ]}
+                >
+                  {`${line.type === 'add' ? '+' : '-'} ${line.text}`}
+                </Text>
+              )
+            )}
+          </ScrollView>
+          <View style={styles.editActions}>
+            <Button title="Apply changes" onPress={() => void handleApply()} busy={busy} />
+            <Button title="Keep editing" variant="secondary" onPress={() => setDiff(null)} />
+          </View>
+        </>
       ) : editing ? (
         <>
           {error ? (
@@ -552,7 +624,7 @@ export default function ResourceItemScreen() {
             spellCheck={false}
           />
           <View style={styles.editActions}>
-            <Button title="Save" onPress={() => void handleSave()} busy={busy} />
+            <Button title="Review & save" onPress={handleReview} busy={busy} />
             <Button
               title="Cancel"
               variant="secondary"
@@ -734,6 +806,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   deleteText: { color: colors.dangerLight, fontSize: 14, fontWeight: '600' },
+  diffSummary: {
+    color: colors.textMid,
+    fontSize: 12.5,
+    fontWeight: '600',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+  },
+  diffScroll: { padding: spacing.lg, paddingTop: 4, paddingBottom: 24 },
+  diffLine: { color: colors.mono, fontFamily: 'Menlo', fontSize: 10.5, lineHeight: 17 },
+  diffAdd: { color: colors.success, backgroundColor: 'rgba(52,211,153,0.1)' },
+  diffDel: { color: colors.danger, backgroundColor: 'rgba(251,113,133,0.1)' },
   editor: {
     flex: 1,
     backgroundColor: colors.backgroundDeep,

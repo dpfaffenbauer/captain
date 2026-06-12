@@ -1,3 +1,4 @@
+import yaml from 'js-yaml';
 import { ApiResourceType, ClusterConfig, KubeList, KubeListItem } from '../types';
 import { kubeStream, KubeStreamHandle, KubeStreamHandlers } from './stream';
 import { kubeRequest, kubeRequestJson } from './transport';
@@ -122,6 +123,36 @@ export async function replaceResource(
     cluster,
     `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}`,
     { method: 'PUT', body: JSON.stringify(manifest) }
+  );
+}
+
+/**
+ * Server-side apply (`kubectl apply --server-side --force-conflicts`): no
+ * resourceVersion race like PUT/replace. Server-managed metadata is stripped
+ * from the manifest first, the YAML body is sent as an apply patch.
+ */
+export async function applyResource(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  manifest: Record<string, unknown>,
+  namespace?: string
+): Promise<void> {
+  const cleaned = { ...manifest };
+  delete cleaned.status;
+  const metadata = { ...((cleaned.metadata as Record<string, unknown>) ?? {}) };
+  for (const field of ['resourceVersion', 'uid', 'generation', 'creationTimestamp', 'managedFields', 'selfLink']) {
+    delete metadata[field];
+  }
+  cleaned.metadata = metadata;
+  await kubeRequest(
+    cluster,
+    `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}?fieldManager=captain&force=true`,
+    {
+      method: 'PATCH',
+      body: yaml.dump(cleaned, { noRefs: true, lineWidth: -1 }),
+      contentType: 'application/apply-patch+yaml',
+    }
   );
 }
 
