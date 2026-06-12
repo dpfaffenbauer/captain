@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -8,11 +8,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ClusterHealth, getClusterHealth, healthTone } from '../src/kube/health';
 import { useClusters } from '../src/state/ClustersContext';
 import { ClusterConfig } from '../src/types';
 import { Card, StatusDot } from '../src/ui/kit';
 import { Loading } from '../src/ui/components';
 import { colors, radius, spacing } from '../src/ui/theme';
+
+const TONE_COLORS = {
+  ok: colors.success,
+  warn: colors.warning,
+  bad: colors.danger,
+  unknown: colors.textFaint,
+} as const;
+
+function healthSummary(health: ClusterHealth | null | undefined): string | null {
+  if (!health) return null;
+  if (!health.reachable) return 'unreachable';
+  const parts = [`${health.nodesReady}/${health.nodesTotal} nodes`, `${health.podsTotal} pods`];
+  if (health.podsProblem > 0) {
+    parts.push(`${health.podsProblem} ${health.podsProblem === 1 ? 'problem' : 'problems'}`);
+  }
+  return parts.join(' · ');
+}
 
 function authLabel(cluster: ClusterConfig): string {
   switch (cluster.auth.type) {
@@ -61,6 +79,22 @@ function ConnectOption({
 export default function HomeScreen() {
   const router = useRouter();
   const { clusters, loading, remove } = useClusters();
+  const [health, setHealth] = useState<Record<string, ClusterHealth | null>>({});
+
+  // Probe every stored cluster in parallel whenever the home screen appears.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      for (const cluster of clusters) {
+        void getClusterHealth(cluster).then((result) => {
+          if (!cancelled) setHealth((current) => ({ ...current, [cluster.id]: result }));
+        });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }, [clusters])
+  );
 
   if (loading) return <Loading />;
 
@@ -91,24 +125,40 @@ export default function HomeScreen() {
         {clusters.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Clusters</Text>
-            {clusters.map((cluster) => (
-              <TouchableOpacity
-                key={cluster.id}
-                onPress={() => router.push(`/cluster/${cluster.id}` as never)}
-                onLongPress={() => confirmDelete(cluster)}
-              >
-                <Card style={styles.clusterRow}>
-                  <StatusDot color={colors.success} />
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.clusterName}>{cluster.name}</Text>
-                    <Text style={styles.clusterSub} numberOfLines={1}>
-                      {authLabel(cluster)} · {cluster.server.replace(/^https?:\/\//, '')}
-                    </Text>
-                  </View>
-                  <Text style={styles.chevron}>›</Text>
-                </Card>
-              </TouchableOpacity>
-            ))}
+            {clusters.map((cluster) => {
+              const clusterHealth = health[cluster.id];
+              const summary = healthSummary(clusterHealth);
+              const tone = healthTone(clusterHealth);
+              return (
+                <TouchableOpacity
+                  key={cluster.id}
+                  onPress={() => router.push(`/cluster/${cluster.id}` as never)}
+                  onLongPress={() => confirmDelete(cluster)}
+                >
+                  <Card style={styles.clusterRow}>
+                    <StatusDot color={TONE_COLORS[tone]} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.clusterName}>{cluster.name}</Text>
+                      <Text style={styles.clusterSub} numberOfLines={1}>
+                        {authLabel(cluster)} · {cluster.server.replace(/^https?:\/\//, '')}
+                      </Text>
+                      {summary ? (
+                        <Text
+                          style={[
+                            styles.clusterHealth,
+                            tone !== 'ok' && { color: TONE_COLORS[tone] },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {summary}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.chevron}>›</Text>
+                  </Card>
+                </TouchableOpacity>
+              );
+            })}
             <Text style={styles.hint}>Long-press a cluster to remove it.</Text>
           </View>
         ) : null}
@@ -188,6 +238,7 @@ const styles = StyleSheet.create({
   },
   clusterName: { color: colors.text, fontSize: 15.5, fontWeight: '600' },
   clusterSub: { color: colors.textDim, fontSize: 12 },
+  clusterHealth: { color: colors.textDim, fontSize: 11.5, fontWeight: '600' },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
