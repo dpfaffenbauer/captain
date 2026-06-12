@@ -29,7 +29,7 @@ import { formatCpuUsage, formatMemoryUsage } from '../../../src/kube/metrics';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, ClusterConfig } from '../../../src/types';
 import { Card, HealthRing, Sparkline, StatusDot, UsageBar } from '../../../src/ui/kit';
-import { ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from '../../../src/ui/sheets';
+import { AlertSheet, ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from '../../../src/ui/sheets';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { ageOf } from '../../../src/util/format';
@@ -249,6 +249,7 @@ export default function DashboardScreen() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [nsOpen, setNsOpen] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<PromAlert | null>(null);
 
   const openPod = useCallback(
     (namespace: string, name: string) => {
@@ -494,12 +495,10 @@ export default function DashboardScreen() {
                   alert.summary ||
                   [alert.namespace, alert.pod].filter(Boolean).join('/') ||
                   alert.severity;
-                const canOpen = Boolean(alert.namespace && alert.pod);
                 return (
                   <TouchableOpacity
                     key={`${alert.name}-${index}`}
-                    disabled={!canOpen}
-                    onPress={() => canOpen && openPod(alert.namespace ?? '', alert.pod ?? '')}
+                    onPress={() => setSelectedAlert(alert)}
                   >
                     <View style={[styles.attention, { borderColor: `${tone}40`, backgroundColor: `${tone}14` }]}>
                       <View style={[styles.attentionIcon, { backgroundColor: `${tone}30` }]}>
@@ -513,7 +512,7 @@ export default function DashboardScreen() {
                           {detail}
                         </Text>
                       </View>
-                      {canOpen ? <Text style={[styles.chevron, { color: `${tone}80` }]}>›</Text> : null}
+                      <Text style={[styles.chevron, { color: `${tone}80` }]}>›</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -601,6 +600,12 @@ export default function DashboardScreen() {
         onOpenNamespaces={() => setNsOpen(true)}
       />
       <NamespaceSheet visible={nsOpen} onClose={() => setNsOpen(false)} cluster={cluster} />
+      <AlertSheet
+        visible={selectedAlert !== null}
+        onClose={() => setSelectedAlert(null)}
+        alert={selectedAlert}
+        onOpenPod={openPod}
+      />
     </View>
   );
 }
