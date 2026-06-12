@@ -26,14 +26,44 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
   Zugriffskontrolle (ServiceAccounts, RBAC) sowie **Custom Resources**
   automatisch gruppiert nach API-Gruppe; alles Übrige unter „Sonstiges".
 - **Lesen, Bearbeiten, Löschen**: Listen mit Namespace-Filter, Pagination und
-  Suche; Detailansicht als YAML; Bearbeiten im YAML-Editor (PUT/replace);
-  Löschen mit Bestätigung.
+  Suche; Detailansicht als YAML; Bearbeiten im YAML-Editor mit **Diff-Vorschau**
+  vor dem Speichern und **Server-Side Apply** (`fieldManager=captain`,
+  `force=true`) — kein 409-Konflikt-Tanz mehr; Löschen mit Bestätigung.
+- **Live-Listen (Watch-API)**: Nach dem initialen Listing hält ein
+  `?watch=true`-Stream die Liste aktuell — Pods erscheinen/verschwinden in
+  Echtzeit, mit automatischem Re-List bei abgelaufener resourceVersion.
+- **Live-Logs**: echtes `kubectl logs -f`-Streaming über das native Modul
+  (chunked URLSession), inkl. Suche im Log, Multi-Container, Previous-Logs
+  und Teilen/Export. In Expo Go fällt Follow auf Polling zurück.
+- **Node-Aktionen**: Cordon/Uncordon sowie Drain über die
+  `policy/v1`-Eviction-Subresource — DaemonSet-/Mirror-Pods bleiben stehen,
+  PodDisruptionBudgets werden respektiert (Ablehnungen erscheinen im Ergebnis).
+- **Helm-Releases**: Releases werden direkt aus den
+  `sh.helm.release.v1`-Secrets gelesen (kein Helm-CLI nötig): Liste mit Status,
+  pro Release Chart-Infos, Revision-History, Values, gerendertes Manifest und
+  Notes (gzip-Payload wird on-device dekodiert).
+- **GitOps (Argo CD / Flux)**: Werden die CRDs entdeckt, zeigt Browse eine
+  GitOps-Ansicht mit Sync-/Health-Status von Applications, Kustomizations und
+  HelmReleases; „Sync"/„Reconcile" funktioniert rein über den API-Server
+  (Argo: `.operation.sync`, Flux: `reconcile.fluxcd.io/requestedAt`).
+- **Related Resources**: Die Detailansicht verlinkt Owner (ownerReferences)
+  und Kinder (Deployment → ReplicaSets/Pods, Service → Pods, Ingress →
+  Services, PVC ↔ Volume/Pods, Pod → Node/PVCs) zum Durchnavigieren.
+- **Multi-Cluster-Dashboard**: Der Home-Screen prüft alle Cluster parallel
+  (Node-Readiness, Problem-Pods) und zeigt Ampel-Status plus Kurzzusammen-
+  fassung pro Cluster.
+- **Face-ID-App-Lock** (optional): verbirgt die App-Inhalte bei Kaltstart und
+  Rückkehr aus dem Hintergrund, bis Face ID/Touch ID bzw. der Geräte-Code
+  bestätigt wurde.
 - **Auth für Cloud-Anbieter**:
   - **AWS EKS**: SigV4-presigned STS-Token (`k8s-aws-v1.…`), äquivalent zu
     `aws eks get-token` — komplett on-device, keine CLI nötig.
   - **Google GKE**: OAuth 2.0 (PKCE) mit Refresh-Token.
   - **Azure AKS**: Microsoft Entra ID OAuth 2.0 (PKCE) gegen die
     AKS-AAD-Server-App.
+  - **Generisches OIDC** (Keycloak, Dex, Authentik …): Authorization Code +
+    PKCE gegen das Discovery-Dokument des Issuers; das ID-Token wird als
+    Bearer gesendet und automatisch erneuert.
   - **Bearer-Token**: z. B. ServiceAccount-Tokens.
   - **Client-Zertifikate (mTLS)**: PKCS#12, nativ über URLSession.
 - **Kubeconfig-Import**: YAML einfügen, Kontexte auswählen, fertig. Exec-Plugins
@@ -74,9 +104,14 @@ app/                          Screens (expo-router)
   cluster/[id]/index.tsx      Ressourcen-Typen (Discovery, gruppiert, Suche)
   cluster/[id]/list.tsx       Ressourcen-Liste (Namespace, Pagination, Suche)
   cluster/[id]/item.tsx       YAML-Detail, Editor, Löschen
+  cluster/[id]/helm.tsx       Helm-Releases (Liste + Detail in helm-release.tsx)
+  cluster/[id]/gitops.tsx     Argo-CD-/Flux-Sync-Status
 src/
-  auth/                       EKS-SigV4, Google/Azure-OAuth, Token-Cache
+  auth/                       EKS-SigV4, Google/Azure-OAuth, generisches OIDC,
+                              Token-Cache
   kube/                       Transport, Discovery, CRUD, Kubeconfig-Parser,
+                              stream.ts (Log-Follow), watch.ts (Live-Listen),
+                              helm.ts, gitops.ts, related.ts, health.ts,
                               metrics-server + Prometheus (prometheus.ts)
   state/, storage/, ui/, util/
 modules/kube-http/            Natives iOS-Modul (Swift): TLS mit eigener CA,
@@ -149,6 +184,18 @@ Voraussetzung: AKS-Cluster mit Entra-ID-Integration (managed AAD).
 4. Der Benutzer braucht passende Kubernetes-RBAC-/Azure-RBAC-Rollen
    (z. B. „Azure Kubernetes Service RBAC Reader/Writer").
 
+### Generisches OIDC (Keycloak, Dex, Authentik …)
+
+Voraussetzung: API-Server mit OIDC-Flags (`--oidc-issuer-url`,
+`--oidc-client-id`, ggf. `--oidc-username-claim`/`--oidc-groups-claim`).
+
+1. Beim Provider einen **public client** mit Redirect-URI `captain://oauth`
+   anlegen (PKCE; ein Client-Secret ist nur für confidential clients nötig).
+2. Im Formular Issuer-URL und Client-ID eintragen, optional zusätzliche
+   Scopes (z. B. `groups`), dann „Beim Provider anmelden".
+3. Captain sendet das **ID-Token** als Bearer und erneuert es über das
+   Refresh-Token.
+
 ### Client-Zertifikate (mTLS)
 
 Kubeconfig-PEMs in PKCS#12 konvertieren und base64-kodiert einfügen:
@@ -168,9 +215,11 @@ base64 -i client.p12 | pbcopy
 ## Bekannte Grenzen
 
 - Kubeconfig-`exec`-Plugins können nicht ausgeführt werden (kein Subprozess auf
-  iOS); der Import mappt sie auf die nativen Auth-Methoden und markiert
+  iOS); der Import mappt sie auf die nativen Auth-Methoden (`aws`,
+  `gke-gcloud-auth-plugin`, `kubelogin`, `oidc-login` → OIDC) und markiert
   fehlende Felder.
 - Exec führt One-Shot-Kommandos aus (`/bin/sh -c …`), kein interaktives TTY.
-- Log-Follow pollt den Tail (3 s), kein echter `follow`-Stream.
-- Bearbeiten nutzt PUT (replace); bei Konflikten (HTTP 409) neu laden und
-  erneut speichern.
+- Helm- und GitOps-Ansichten sind lesend (plus Sync-Trigger); Upgrade/
+  Rollback/Uninstall von Releases bleibt dem CLI überlassen.
+- In Expo Go (ohne natives Modul) gibt es kein Log-Streaming und keine
+  Live-Listen; Follow fällt auf Polling zurück.
