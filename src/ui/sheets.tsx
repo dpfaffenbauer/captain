@@ -5,6 +5,12 @@ import { listNamespaces } from '../kube/client';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
 import { useClusters } from '../state/ClustersContext';
 import { ClusterConfig } from '../types';
+import {
+  authenticate,
+  isBiometricAvailable,
+  loadAppLockSetting,
+  setAppLockEnabled,
+} from '../util/applock';
 import { hapticWarning, loadHapticsSetting, setHapticsEnabled } from '../util/haptics';
 import { BottomSheet, StatusDot } from './kit';
 import { colors, radius } from './theme';
@@ -142,12 +148,31 @@ export function SettingsSheet({
   const { clusters, remove } = useClusters();
   const { namespace } = useClusterScope();
   const [haptics, setHaptics] = useState(true);
+  const [appLock, setAppLock] = useState(false);
+  const [biometrics, setBiometrics] = useState(false);
 
   useEffect(() => {
     if (visible) {
       void loadHapticsSetting().then(setHaptics);
+      void loadAppLockSetting().then(setAppLock);
+      void isBiometricAvailable().then(setBiometrics);
     }
   }, [visible]);
+
+  const toggleAppLock = (value: boolean) => {
+    if (!value) {
+      // Turning the lock off requires passing it one last time.
+      void authenticate().then((success) => {
+        if (success) {
+          setAppLock(false);
+          void setAppLockEnabled(false);
+        }
+      });
+      return;
+    }
+    setAppLock(true);
+    void setAppLockEnabled(true);
+  };
 
   const signOutAll = () => {
     hapticWarning();
@@ -191,6 +216,19 @@ export function SettingsSheet({
             trackColor={{ true: colors.accent, false: 'rgba(255,255,255,0.14)' }}
           />
         </View>
+        {biometrics ? (
+          <View style={[styles.settingRow, styles.settingDivider]}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.settingTitle}>Face ID lock</Text>
+              <Text style={styles.rowSub}>Require Face ID when opening the app</Text>
+            </View>
+            <Switch
+              value={appLock}
+              onValueChange={toggleAppLock}
+              trackColor={{ true: colors.accent, false: 'rgba(255,255,255,0.14)' }}
+            />
+          </View>
+        ) : null}
         <TouchableOpacity
           style={[styles.settingRow, styles.settingDivider]}
           onPress={() => {

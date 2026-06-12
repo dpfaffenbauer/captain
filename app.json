@@ -33,6 +33,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
+      "expo-local-authentication",
       [
         "expo-camera",
         {
