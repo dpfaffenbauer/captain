@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { listResources, restartRollout } from '../../../src/kube/client';
+import { listResources, restartRollout, scaleResource } from '../../../src/kube/client';
 import {
   formatCpuUsage,
   formatMemoryUsage,
@@ -187,6 +187,26 @@ export default function ResourceListScreen() {
     ]);
   };
 
+  const handleScale = (item: KubeListItem) => {
+    const current = (item.raw as any).spec?.replicas ?? 0;
+    Alert.prompt(
+      'Scale',
+      `${item.name} · currently ${current} replicas`,
+      (value) => {
+        const replicas = parseInt(value, 10);
+        if (Number.isNaN(replicas) || replicas < 0 || !cluster) return;
+        scaleResource(cluster, type, item.name, replicas, item.namespace)
+          .then(() => load(true))
+          .catch((caught) =>
+            setError(caught instanceof Error ? caught.message : String(caught))
+          );
+      },
+      'plain-text',
+      String(current),
+      'number-pad'
+    );
+  };
+
   const renderItem = ({ item }: { item: KubeListItem }) => {
     const raw = item.raw as any;
 
@@ -308,9 +328,14 @@ export default function ResourceListScreen() {
               <Text style={styles.depImage} numberOfLines={1}>
                 {image}
               </Text>
-              <TouchableOpacity style={styles.restartButton} onPress={() => handleRestart(item)}>
-                <Text style={styles.restartText}>↺ Restart</Text>
-              </TouchableOpacity>
+              <View style={styles.depActions}>
+                <TouchableOpacity style={styles.restartButton} onPress={() => handleScale(item)}>
+                  <Text style={styles.restartText}>⇅ Scale</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.restartButton} onPress={() => handleRestart(item)}>
+                  <Text style={styles.restartText}>↺ Restart</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </Card>
         </TouchableOpacity>
@@ -458,6 +483,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Menlo',
     fontSize: 10,
   },
+  depActions: { flexDirection: 'row', gap: 7 },
   restartButton: {
     backgroundColor: colors.accentSoft,
     borderRadius: radius.pill,

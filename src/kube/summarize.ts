@@ -114,6 +114,8 @@ function deploymentSummary(manifest: Manifest): Array<SummarySection | undefined
   const desired = spec.replicas ?? 0;
   return [
     section('Replicas', [
+      row('Pausiert', spec.paused === true ? 'ja' : undefined, { status: 'warn' }),
+      row('Revision', manifest.metadata?.annotations?.['deployment.kubernetes.io/revision']),
       row('Gewünscht', desired),
       row('Bereit', `${status.readyReplicas ?? 0} / ${desired}`, {
         status: replicaStatus(status.readyReplicas ?? 0, desired),

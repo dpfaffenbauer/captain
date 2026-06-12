@@ -15,11 +15,17 @@ import {
 import {
   deleteResource,
   getResource,
+  listDeploymentRevisions,
   listEventsFor,
   replaceResource,
   ResourceEvent,
   restartRollout,
+  rollbackDeployment,
   scaleResource,
+  setContainerImage,
+  setCronJobSuspended,
+  setRolloutPaused,
+  triggerCronJob,
 } from '../../../src/kube/client';
 import { startPortForward } from '../../../src/kube/portforward';
 import { summarizeResource, SummarySection } from '../../../src/kube/summarize';
@@ -208,7 +214,9 @@ export default function ResourceItemScreen() {
         : phase
           ? { label: phase, color: colors.warning }
           : undefined
-    : undefined;
+    : typeKey === 'apps/Deployment' && (manifest?.spec as any)?.paused === true
+      ? { label: 'Paused', color: colors.warning }
+      : undefined;
 
   const runAction = async (action: () => Promise<void>) => {
     if (!cluster) return;
@@ -257,6 +265,100 @@ export default function ResourceItemScreen() {
       {
         text: 'Restart',
         onPress: () => void runAction(() => restartRollout(cluster!, type, params.name, namespace)),
+      },
+    ]);
+  };
+
+  const rolloutPaused = (manifest?.spec as any)?.paused === true;
+  const cronSuspended = (manifest?.spec as any)?.suspend === true;
+
+  const handlePauseResume = () => {
+    hapticTap();
+    void runAction(() => setRolloutPaused(cluster!, type, params.name, !rolloutPaused, namespace));
+  };
+
+  const handleRollback = async () => {
+    if (!cluster || !namespace) return;
+    setBusy(true);
+    setError('');
+    try {
+      const revisions = await listDeploymentRevisions(cluster, namespace, params.name);
+      const previous = revisions.find((entry) => !entry.current);
+      if (!previous) {
+        setError('No previous revision to roll back to.');
+        return;
+      }
+      Alert.alert(
+        'Rollback',
+        `Roll back to revision ${previous.revision}?\n\n${previous.images.join('\n')}${
+          previous.changeCause ? `\n\n${previous.changeCause}` : ''
+        }`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Roll back',
+            style: 'destructive',
+            onPress: () =>
+              void runAction(() => rollbackDeployment(cluster, namespace, params.name, previous)),
+          },
+        ]
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSetImage = () => {
+    const containers: any[] = (manifest?.spec as any)?.template?.spec?.containers ?? [];
+    if (containers.length === 0) return;
+    const promptFor = (container: any) => {
+      Alert.prompt(
+        'Set image',
+        container.name,
+        (value) => {
+          const image = value?.trim();
+          if (!image || image === container.image) return;
+          void runAction(() =>
+            setContainerImage(cluster!, type, params.name, container.name, image, namespace)
+          );
+        },
+        'plain-text',
+        container.image ?? ''
+      );
+    };
+    if (containers.length === 1) {
+      promptFor(containers[0]);
+      return;
+    }
+    Alert.alert('Set image', 'Choose a container', [
+      ...containers.map((container) => ({
+        text: container.name,
+        onPress: () => promptFor(container),
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
+
+  const handleSuspendCron = () => {
+    hapticTap();
+    void runAction(() =>
+      setCronJobSuspended(cluster!, type, params.name, !cronSuspended, namespace)
+    );
+  };
+
+  const handleTriggerCron = () => {
+    if (!namespace) return;
+    Alert.alert('Run now', `Create a one-off job from "${params.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Run',
+        onPress: () =>
+          void runAction(async () => {
+            const jobName = await triggerCronJob(cluster!, type, params.name, namespace);
+            Alert.alert('Job created', jobName);
+          }),
       },
     ]);
   };
@@ -365,6 +467,27 @@ export default function ResourceItemScreen() {
   }
   if (RESTARTABLE.has(typeKey) && canEdit) {
     actions.push({ key: 'restart', label: 'Restart', icon: '↺', onPress: handleRestart });
+    actions.push({ key: 'image', label: 'Image', icon: '⬡', onPress: handleSetImage });
+  }
+  if (typeKey === 'apps/Deployment' && canEdit) {
+    if (namespace) {
+      actions.push({ key: 'rollback', label: 'Undo', icon: '↶', onPress: () => void handleRollback() });
+    }
+    actions.push({
+      key: 'pause',
+      label: rolloutPaused ? 'Resume' : 'Pause',
+      icon: rolloutPaused ? '▶' : '❚❚',
+      onPress: handlePauseResume,
+    });
+  }
+  if (typeKey === 'batch/CronJob' && canEdit && namespace) {
+    actions.push({ key: 'trigger', label: 'Run now', icon: '▶', onPress: handleTriggerCron });
+    actions.push({
+      key: 'suspend',
+      label: cronSuspended ? 'Resume' : 'Suspend',
+      icon: cronSuspended ? '▶' : '❚❚',
+      onPress: handleSuspendCron,
+    });
   }
   if (canEdit) {
     actions.push({
@@ -537,9 +660,10 @@ const styles = StyleSheet.create({
   statusPillText: { fontSize: 11, fontWeight: '700' },
   errorWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingTop: 8, paddingBottom: 60, gap: 12 },
-  actionGrid: { flexDirection: 'row', gap: 8 },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actionCell: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '18%',
     alignItems: 'center',
     gap: 6,
     backgroundColor: colors.surface,
