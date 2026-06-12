@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { listResources, restartRollout, scaleResource } from '../../../src/kube/client';
@@ -25,6 +26,7 @@ import { namespaceLabel, useClusterScope } from '../../../src/state/ClusterScope
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, KubeListItem } from '../../../src/types';
 import { BackButton, Card, Pill, StatusDot, UsageBar } from '../../../src/ui/kit';
+import { InspectorPlaceholder, ResourceInspector } from '../../../src/ui/ResourceInspector';
 import { NamespaceSheet } from '../../../src/ui/sheets';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
 import { colors, radius, spacing } from '../../../src/ui/theme';
@@ -104,6 +106,11 @@ export default function ResourceListScreen() {
   const [nsOpen, setNsOpen] = useState(false);
   const [usage, setUsage] = useState<Map<string, ResourceUsage> | null>(null);
   const [live, setLive] = useState(false);
+  const [selected, setSelected] = useState<KubeListItem | null>(null);
+
+  // iPad / landscape: list on the left, inspector pane on the right.
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
 
   const isPods = type.group === '' && type.kind === 'Pod';
   const isDeployments = type.group === 'apps' && type.kind === 'Deployment';
@@ -226,6 +233,17 @@ export default function ResourceListScreen() {
     );
   }, [items, filter]);
 
+  // A new kind or namespace invalidates the inspector selection.
+  useEffect(() => setSelected(null), [type, namespace]);
+
+  const handlePress = (item: KubeListItem) => {
+    if (isWide) {
+      setSelected(item);
+    } else {
+      openItem(item);
+    }
+  };
+
   const openItem = (item: KubeListItem) => {
     router.push({
       pathname: '/cluster/[id]/item',
@@ -282,14 +300,19 @@ export default function ResourceListScreen() {
 
   const renderItem = ({ item }: { item: KubeListItem }) => {
     const raw = item.raw as any;
+    const isSelected =
+      isWide &&
+      selected != null &&
+      `${selected.namespace ?? ''}/${selected.name}` === `${item.namespace ?? ''}/${item.name}`;
+    const selectionBorder = isSelected ? 'rgba(91,124,255,0.55)' : undefined;
 
     if (isPods) {
       const sev = podSeverity(raw);
       const restarts = podRestarts(raw);
       const podUsage = usage?.get(`${item.namespace ?? ''}/${item.name}`);
       return (
-        <TouchableOpacity onPress={() => openItem(item)}>
-          <Card style={styles.podCard}>
+        <TouchableOpacity onPress={() => handlePress(item)}>
+          <Card style={styles.podCard} borderColor={selectionBorder}>
             <StatusDot color={sev.color} size={10} />
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={styles.itemName} numberOfLines={1}>
@@ -334,10 +357,12 @@ export default function ResourceListScreen() {
       const barColor = (pct: number) =>
         pct >= 85 ? colors.danger : pct >= 60 ? colors.warning : colors.accent;
       return (
-        <TouchableOpacity onPress={() => openItem(item)}>
+        <TouchableOpacity onPress={() => handlePress(item)}>
           <Card
             style={styles.nodeCard}
-            borderColor={tone === colors.warning ? 'rgba(251,191,85,0.3)' : undefined}
+            borderColor={
+              selectionBorder ?? (tone === colors.warning ? 'rgba(251,191,85,0.3)' : undefined)
+            }
           >
             <View style={styles.nodeHead}>
               <StatusDot color={tone} size={9} />
@@ -386,8 +411,8 @@ export default function ResourceListScreen() {
       const tone = ready >= desired && desired > 0 ? colors.success : desired === 0 ? colors.textDim : colors.warning;
       const image = raw.spec?.template?.spec?.containers?.[0]?.image ?? '';
       return (
-        <TouchableOpacity onPress={() => openItem(item)}>
-          <Card style={styles.depCard}>
+        <TouchableOpacity onPress={() => handlePress(item)}>
+          <Card style={styles.depCard} borderColor={selectionBorder}>
             <View style={styles.depHead}>
               <Text style={[styles.itemName, { flex: 1 }]} numberOfLines={1}>
                 {item.name}
@@ -416,8 +441,8 @@ export default function ResourceListScreen() {
     }
 
     return (
-      <TouchableOpacity onPress={() => openItem(item)}>
-        <Card style={styles.genericCard}>
+      <TouchableOpacity onPress={() => handlePress(item)}>
+        <Card style={styles.genericCard} borderColor={selectionBorder}>
           <StatusDot color={colors.success} size={8} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.itemName} numberOfLines={1}>
@@ -433,6 +458,37 @@ export default function ResourceListScreen() {
   };
 
   if (!cluster) return <EmptyState message="Cluster not found." />;
+
+  const listView = (
+    <FlatList
+      data={visibleItems}
+      keyExtractor={(item) => `${item.namespace ?? ''}/${item.name}`}
+      contentContainerStyle={styles.listContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load(true);
+          }}
+          tintColor={colors.accent}
+        />
+      }
+      ListEmptyComponent={<EmptyState message={`No ${type.plural} found.`} />}
+      ListFooterComponent={
+        continueToken ? (
+          <View style={{ paddingTop: spacing.md }}>
+            <Button
+              title="Load more"
+              variant="secondary"
+              onPress={() => void load(false, continueToken)}
+            />
+          </View>
+        ) : null
+      }
+      renderItem={renderItem}
+    />
+  );
 
   return (
     <View style={styles.container}>
@@ -478,35 +534,27 @@ export default function ResourceListScreen() {
         </View>
       ) : loading ? (
         <Loading />
+      ) : isWide ? (
+        <View style={styles.splitRow}>
+          <View style={styles.splitList}>{listView}</View>
+          <View style={styles.splitDivider} />
+          <View style={styles.splitPane}>
+            {selected ? (
+              <ResourceInspector
+                key={`${selected.namespace ?? ''}/${selected.name}`}
+                cluster={cluster}
+                type={type}
+                name={selected.name}
+                namespace={selected.namespace}
+                onOpenFull={() => openItem(selected)}
+              />
+            ) : (
+              <InspectorPlaceholder />
+            )}
+          </View>
+        </View>
       ) : (
-        <FlatList
-          data={visibleItems}
-          keyExtractor={(item) => `${item.namespace ?? ''}/${item.name}`}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                void load(true);
-              }}
-              tintColor={colors.accent}
-            />
-          }
-          ListEmptyComponent={<EmptyState message={`No ${type.plural} found.`} />}
-          ListFooterComponent={
-            continueToken ? (
-              <View style={{ paddingTop: spacing.md }}>
-                <Button
-                  title="Load more"
-                  variant="secondary"
-                  onPress={() => void load(false, continueToken)}
-                />
-              </View>
-            ) : null
-          }
-          renderItem={renderItem}
-        />
+        listView
       )}
 
       <NamespaceSheet visible={nsOpen} onClose={() => setNsOpen(false)} cluster={cluster} />
@@ -588,5 +636,9 @@ const styles = StyleSheet.create({
     padding: 13,
     borderRadius: radius.card,
   },
+  splitRow: { flex: 1, flexDirection: 'row' },
+  splitList: { width: 400 },
+  splitDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  splitPane: { flex: 1 },
   chevron: { color: 'rgba(242,245,250,0.22)', fontSize: 18, fontWeight: '600' },
 });

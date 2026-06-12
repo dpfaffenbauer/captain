@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {
@@ -37,6 +38,9 @@ export default function BrowseScreen() {
   const forwardsCount = useSyncExternalStore(subscribeForwards, getForwards).filter(
     (forward) => forward.clusterId === id
   ).length;
+  // iPad: don't stretch the category cards across the full width.
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
 
   const load = useCallback(async () => {
     if (!cluster) return;
@@ -103,7 +107,10 @@ export default function BrowseScreen() {
       ) : loading ? (
         <Loading />
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.scroll, isWide && styles.scrollWide]}
+        >
           <View style={{ gap: 9 }}>
             <View style={styles.catHead}>
               <Text style={styles.catTitle}>Apps</Text>
@@ -225,6 +232,7 @@ const styles = StyleSheet.create({
   searchIcon: { color: colors.textFaint, fontSize: 16 },
   searchText: { color: colors.textFaint, fontSize: 14 },
   scroll: { padding: spacing.lg, paddingTop: 14, paddingBottom: 130, gap: 20 },
+  scrollWide: { maxWidth: 720, width: '100%', alignSelf: 'center' },
   catHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 4 },
   catTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   catMeta: { color: colors.textFaint, fontSize: 11 },

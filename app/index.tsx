@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { publishWidgetSnapshot, WidgetClusterEntry } from '../modules/captain-widget';
@@ -83,6 +84,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { clusters, loading, remove } = useClusters();
   const [health, setHealth] = useState<Record<string, ClusterHealth | null>>({});
+  // iPad: keep the hero/cluster cards at a phone-ish width, centered.
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
 
   // Probe every stored cluster in parallel whenever the home screen appears.
   useFocusEffect(
@@ -127,7 +131,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.scroll, isWide && styles.scrollWide]}
+      >
         {/* Hero */}
         <View style={[styles.hero, clusters.length > 0 && styles.heroCompact]}>
           <View style={styles.logo}>
@@ -223,6 +230,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.xl, paddingBottom: 54, flexGrow: 1, justifyContent: 'center' },
+  scrollWide: { maxWidth: 640, width: '100%', alignSelf: 'center' },
   hero: { alignItems: 'center', gap: 18, paddingVertical: 28 },
   heroCompact: { paddingVertical: 16, gap: 10 },
   logo: {
