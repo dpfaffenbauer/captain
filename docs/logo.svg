@@ -1,0 +1,39 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'>
+  <defs>
+    <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0' stop-color='#5d7bff'/>
+      <stop offset='1' stop-color='#7e45f0'/>
+    </linearGradient>
+    <linearGradient id='gold' x1='0' y1='0' x2='0' y2='1'>
+      <stop offset='0' stop-color='#f7c84f'/>
+      <stop offset='1' stop-color='#dd9a20'/>
+    </linearGradient>
+  </defs>
+  <rect width='1024' height='1024' rx='232' fill='url(#bg)'/>
+  <g stroke='#ffffff' stroke-linecap='round' fill='none'>
+    <line x1='512.0' y1='210.0' x2='512.0' y2='116.0' stroke-width='54'/>
+    <line x1='748.1' y1='323.7' x2='821.6' y2='265.1' stroke-width='54'/>
+    <line x1='806.4' y1='579.2' x2='898.1' y2='600.1' stroke-width='54'/>
+    <line x1='643.0' y1='784.1' x2='683.8' y2='868.8' stroke-width='54'/>
+    <line x1='381.0' y1='784.1' x2='340.2' y2='868.8' stroke-width='54'/>
+    <line x1='217.6' y1='579.2' x2='125.9' y2='600.1' stroke-width='54'/>
+    <line x1='275.9' y1='323.7' x2='202.4' y2='265.1' stroke-width='54'/>
+    <circle cx='512' cy='512' r='288' stroke-width='40'/>
+    <line x1='512.0' y1='382.0' x2='512.0' y2='242.0' stroke-width='34'/>
+    <line x1='613.6' y1='430.9' x2='723.1' y2='343.7' stroke-width='34'/>
+    <line x1='638.7' y1='540.9' x2='775.2' y2='572.1' stroke-width='34'/>
+    <line x1='568.4' y1='629.1' x2='629.1' y2='755.3' stroke-width='34'/>
+    <line x1='455.6' y1='629.1' x2='394.9' y2='755.3' stroke-width='34'/>
+    <line x1='385.3' y1='540.9' x2='248.8' y2='572.1' stroke-width='34'/>
+    <line x1='410.4' y1='430.9' x2='300.9' y2='343.7' stroke-width='34'/>
+  </g>
+  <circle cx='512' cy='512' r='134' fill='url(#gold)' stroke='#ffffff' stroke-width='14'/>
+  <g transform='translate(512 512) scale(1.18)' stroke='#2b3169' stroke-width='15' stroke-linecap='round' stroke-linejoin='round' fill='none'>
+    <circle cy='-62' r='15'/>
+    <line x1='0' y1='-47' x2='0' y2='72'/>
+    <line x1='-33' y1='-24' x2='33' y2='-24'/>
+    <path d='M -58 14 A 58 58 0 0 0 0 72 A 58 58 0 0 0 58 14'/>
+    <path d='M -58 14 L -76 8 L -62 34' fill='#2b3169' stroke='none'/>
+    <path d='M 58 14 L 76 8 L 62 34' fill='#2b3169' stroke='none'/>
+  </g>
+</svg>
