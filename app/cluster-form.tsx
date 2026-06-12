@@ -10,7 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { azureRedirectUri, azureSignIn, googleSignIn, OAuthTokens } from '../src/auth/oauth';
+import {
+  azureRedirectUri,
+  azureSignIn,
+  googleSignIn,
+  OAuthTokens,
+  oidcRedirectUri,
+  oidcSignIn,
+} from '../src/auth/oauth';
 import { invalidateToken } from '../src/auth/tokens';
 import { getServerVersion } from '../src/kube/client';
 import { useClusters } from '../src/state/ClustersContext';
@@ -24,6 +31,7 @@ const AUTH_TYPES: Array<{ type: AuthType; label: string }> = [
   { type: 'eks', label: 'AWS EKS' },
   { type: 'gke', label: 'Google GKE' },
   { type: 'aks', label: 'Azure AKS' },
+  { type: 'oidc', label: 'OIDC' },
   { type: 'clientCert', label: 'Zertifikat' },
 ];
 
@@ -55,12 +63,18 @@ export default function ClusterFormScreen() {
   const aksAuth = existing?.auth.type === 'aks' ? existing.auth : undefined;
   const [aksTenantId, setAksTenantId] = useState(aksAuth?.tenantId ?? '');
   const [aksClientId, setAksClientId] = useState(aksAuth?.clientId ?? '');
+  const oidcAuth = existing?.auth.type === 'oidc' ? existing.auth : undefined;
+  const [oidcIssuer, setOidcIssuer] = useState(oidcAuth?.issuer ?? '');
+  const [oidcClientId, setOidcClientId] = useState(oidcAuth?.clientId ?? '');
+  const [oidcClientSecret, setOidcClientSecret] = useState(oidcAuth?.clientSecret ?? '');
+  const [oidcExtraScopes, setOidcExtraScopes] = useState(oidcAuth?.extraScopes ?? '');
   const [oauthTokens, setOauthTokens] = useState<OAuthTokens | undefined>(
-    gkeAuth?.accessToken || aksAuth?.accessToken
+    gkeAuth?.accessToken || aksAuth?.accessToken || oidcAuth?.accessToken
       ? {
-          accessToken: (gkeAuth?.accessToken ?? aksAuth?.accessToken)!,
-          refreshToken: gkeAuth?.refreshToken ?? aksAuth?.refreshToken,
-          expiresAt: gkeAuth?.expiresAt ?? aksAuth?.expiresAt ?? 0,
+          accessToken: (gkeAuth?.accessToken ?? aksAuth?.accessToken ?? oidcAuth?.accessToken)!,
+          refreshToken: gkeAuth?.refreshToken ?? aksAuth?.refreshToken ?? oidcAuth?.refreshToken,
+          idToken: oidcAuth?.idToken,
+          expiresAt: gkeAuth?.expiresAt ?? aksAuth?.expiresAt ?? oidcAuth?.expiresAt ?? 0,
         }
       : undefined
   );
@@ -120,6 +134,21 @@ export default function ClusterFormScreen() {
             expiresAt: oauthTokens?.expiresAt,
           },
         };
+      case 'oidc':
+        return {
+          ...base,
+          auth: {
+            type: 'oidc',
+            issuer: oidcIssuer.trim(),
+            clientId: oidcClientId.trim(),
+            clientSecret: oidcClientSecret.trim() || undefined,
+            extraScopes: oidcExtraScopes.trim() || undefined,
+            idToken: oauthTokens?.idToken,
+            accessToken: oauthTokens?.accessToken,
+            refreshToken: oauthTokens?.refreshToken,
+            expiresAt: oauthTokens?.expiresAt,
+          },
+        };
     }
   };
 
@@ -139,6 +168,7 @@ export default function ClusterFormScreen() {
     }
     if (authType === 'gke' && !oauthTokens) return 'Bitte zuerst mit Google anmelden.';
     if (authType === 'aks' && !oauthTokens) return 'Bitte zuerst mit Microsoft anmelden.';
+    if (authType === 'oidc' && !oauthTokens) return 'Bitte zuerst beim OIDC-Provider anmelden.';
     return undefined;
   };
 
@@ -149,7 +179,12 @@ export default function ClusterFormScreen() {
       const tokens =
         authType === 'gke'
           ? await googleSignIn(gkeClientId.trim())
-          : await azureSignIn(aksTenantId.trim(), aksClientId.trim());
+          : authType === 'aks'
+            ? await azureSignIn(aksTenantId.trim(), aksClientId.trim())
+            : await oidcSignIn(oidcIssuer.trim(), oidcClientId.trim(), {
+                clientSecret: oidcClientSecret.trim() || undefined,
+                extraScopes: oidcExtraScopes.trim() || undefined,
+              });
       setOauthTokens(tokens);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -191,6 +226,7 @@ export default function ClusterFormScreen() {
   };
 
   const azureRedirect = useMemo(() => azureRedirectUri(), []);
+  const oidcRedirect = useMemo(() => oidcRedirectUri(), []);
 
   return (
     <KeyboardAvoidingView
@@ -306,6 +342,48 @@ export default function ClusterFormScreen() {
               disabled={!aksTenantId.trim() || !aksClientId.trim()}
               busy={busy}
             />
+          </>
+        )}
+
+        {authType === 'oidc' && (
+          <>
+            <Field
+              label="Issuer-URL"
+              value={oidcIssuer}
+              onChangeText={setOidcIssuer}
+              placeholder="https://keycloak.example.com/realms/main"
+              keyboardType="url"
+            />
+            <Field
+              label="Client-ID"
+              value={oidcClientId}
+              onChangeText={setOidcClientId}
+              placeholder="kubernetes"
+            />
+            <Field
+              label="Client-Secret (nur für confidential clients)"
+              value={oidcClientSecret}
+              onChangeText={setOidcClientSecret}
+              secureTextEntry
+            />
+            <Field
+              label="Zusätzliche Scopes (optional, z. B. groups)"
+              value={oidcExtraScopes}
+              onChangeText={setOidcExtraScopes}
+              placeholder="groups"
+            />
+            <Text style={styles.hint}>Redirect-URI für den OIDC-Client: {oidcRedirect}</Text>
+            <Button
+              title={oauthTokens ? 'Angemeldet – erneut anmelden' : 'Beim Provider anmelden'}
+              variant={oauthTokens ? 'secondary' : 'primary'}
+              onPress={() => void handleOAuthSignIn()}
+              disabled={!oidcIssuer.trim() || !oidcClientId.trim()}
+              busy={busy}
+            />
+            <Text style={styles.hint}>
+              Der API-Server muss mit passenden --oidc-issuer-url/--oidc-client-id-Flags
+              konfiguriert sein; Captain sendet das ID-Token als Bearer.
+            </Text>
           </>
         )}
 

@@ -6,6 +6,8 @@ WebBrowser.maybeCompleteAuthSession();
 export interface OAuthTokens {
   accessToken: string;
   refreshToken?: string;
+  /** OIDC ID token — the credential Kubernetes itself validates. */
+  idToken?: string;
   /** Unix epoch milliseconds. */
   expiresAt: number;
 }
@@ -27,6 +29,7 @@ function toTokens(response: AuthSession.TokenResponse, previousRefreshToken?: st
   return {
     accessToken: response.accessToken,
     refreshToken: response.refreshToken ?? previousRefreshToken,
+    idToken: response.idToken,
     expiresAt: (response.issuedAt + (response.expiresIn ?? 300)) * 1000,
   };
 }
@@ -49,7 +52,8 @@ async function signIn(
   scopes: string[],
   redirectUri: string,
   discovery: AuthSession.DiscoveryDocument,
-  extraParams?: Record<string, string>
+  extraParams?: Record<string, string>,
+  clientSecret?: string
 ): Promise<OAuthTokens> {
   const request = new AuthSession.AuthRequest({
     clientId,
@@ -70,6 +74,7 @@ async function signIn(
   const tokenResponse = await AuthSession.exchangeCodeAsync(
     {
       clientId,
+      clientSecret,
       code: result.params.code,
       redirectUri,
       extraParams: request.codeVerifier ? { code_verifier: request.codeVerifier } : undefined,
@@ -102,6 +107,57 @@ export async function azureSignIn(tenantId: string, clientId: string): Promise<O
     azureRedirectUri(),
     azureDiscovery(tenantId)
   );
+}
+
+export function oidcRedirectUri(): string {
+  return AuthSession.makeRedirectUri({ scheme: 'captain', path: 'oauth' });
+}
+
+function oidcScopes(extraScopes?: string): string[] {
+  const scopes = ['openid', 'profile', 'email', 'offline_access'];
+  for (const scope of (extraScopes ?? '').split(/\s+/)) {
+    if (scope && !scopes.includes(scope)) scopes.push(scope);
+  }
+  return scopes;
+}
+
+/**
+ * Generic OIDC sign-in (Keycloak, Dex, Authentik, …): endpoints come from the
+ * issuer's discovery document, the flow is Authorization Code + PKCE.
+ */
+export async function oidcSignIn(
+  issuer: string,
+  clientId: string,
+  options: { clientSecret?: string; extraScopes?: string } = {}
+): Promise<OAuthTokens> {
+  const discovery = await AuthSession.fetchDiscoveryAsync(issuer.replace(/\/+$/, ''));
+  return signIn(
+    clientId,
+    oidcScopes(options.extraScopes),
+    oidcRedirectUri(),
+    discovery,
+    undefined,
+    options.clientSecret
+  );
+}
+
+export async function oidcRefresh(
+  issuer: string,
+  clientId: string,
+  refreshToken: string,
+  options: { clientSecret?: string; extraScopes?: string } = {}
+): Promise<OAuthTokens> {
+  const discovery = await AuthSession.fetchDiscoveryAsync(issuer.replace(/\/+$/, ''));
+  const response = await AuthSession.refreshAsync(
+    {
+      clientId,
+      clientSecret: options.clientSecret,
+      refreshToken,
+      scopes: oidcScopes(options.extraScopes),
+    },
+    discovery
+  );
+  return toTokens(response, refreshToken);
 }
 
 export async function azureRefresh(

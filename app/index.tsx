@@ -44,6 +44,8 @@ function authLabel(cluster: ClusterConfig): string {
       return 'Google GKE';
     case 'aks':
       return 'Azure AKS';
+    case 'oidc':
+      return 'OIDC';
   }
 }
 

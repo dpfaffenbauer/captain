@@ -48,6 +48,16 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
       warnings.push('GKE: Bitte OAuth-Client-ID eintragen und mit Google anmelden.');
       return { type: 'gke', clientId: '' };
     }
+    // int128/kubelogin (oidc-login) carries the issuer in its args.
+    if (args.some((arg) => arg.startsWith('--oidc-issuer-url'))) {
+      warnings.push('OIDC: Bitte beim Provider anmelden, um Tokens zu erhalten.');
+      return {
+        type: 'oidc',
+        issuer: execArg(args, '--oidc-issuer-url') ?? '',
+        clientId: execArg(args, '--oidc-client-id') ?? '',
+        clientSecret: execArg(args, '--oidc-client-secret') || undefined,
+      };
+    }
     if (command.includes('kubelogin') || args.some((arg) => arg.includes('azure'))) {
       warnings.push('AKS: Bitte Tenant-ID und Client-ID eintragen und mit Microsoft anmelden.');
       return { type: 'aks', tenantId: execArg(args, '--tenant-id') ?? '', clientId: '' };
@@ -64,6 +74,15 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
   if (authProvider?.name === 'azure') {
     warnings.push('AKS: Bitte Tenant-ID und Client-ID eintragen und mit Microsoft anmelden.');
     return { type: 'aks', tenantId: authProvider.config?.['tenant-id'] ?? '', clientId: '' };
+  }
+  if (authProvider?.name === 'oidc') {
+    warnings.push('OIDC: Bitte beim Provider anmelden, um Tokens zu erhalten.');
+    return {
+      type: 'oidc',
+      issuer: authProvider.config?.['idp-issuer-url'] ?? '',
+      clientId: authProvider.config?.['client-id'] ?? '',
+      clientSecret: authProvider.config?.['client-secret'] || undefined,
+    };
   }
 
   if (typeof user['client-certificate-data'] === 'string') {

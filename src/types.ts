@@ -24,6 +24,22 @@ export type AuthConfig =
       accessToken?: string;
       refreshToken?: string;
       expiresAt?: number;
+    }
+  | {
+      /** Generic OIDC provider (Keycloak, Dex, Authentik, …) via PKCE. */
+      type: 'oidc';
+      /** Issuer URL, e.g. https://keycloak.example.com/realms/main */
+      issuer: string;
+      clientId: string;
+      /** Only for confidential clients; public clients use pure PKCE. */
+      clientSecret?: string;
+      /** Extra scopes besides openid/profile/email/offline_access (space-separated). */
+      extraScopes?: string;
+      /** Kubernetes validates the ID token (kubectl oidc behavior). */
+      idToken?: string;
+      accessToken?: string;
+      refreshToken?: string;
+      expiresAt?: number;
     };
 
 export type AuthType = AuthConfig['type'];

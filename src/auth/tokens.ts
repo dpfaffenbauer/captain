@@ -1,6 +1,6 @@
 import { AuthConfig, ClusterConfig } from '../types';
 import { generateEksToken } from './eks';
-import { azureRefresh, googleRefresh } from './oauth';
+import { azureRefresh, googleRefresh, oidcRefresh } from './oauth';
 
 interface CachedToken {
   token: string;
@@ -45,9 +45,14 @@ export async function getBearerToken(cluster: ClusterConfig): Promise<string | u
     return token;
   }
 
-  // gke / aks: use the stored access token while valid, otherwise refresh.
+  // gke / aks / oidc: use the stored token while valid, otherwise refresh.
+  // For generic OIDC the API server validates the ID token (kubectl behavior),
+  // for GKE/AKS it is the access token.
+  const bearerOf = (a: typeof auth, accessToken: string, idToken?: string) =>
+    a.type === 'oidc' ? idToken ?? accessToken : accessToken;
+
   if (auth.accessToken && (auth.expiresAt ?? 0) > Date.now() + 60 * 1000) {
-    return auth.accessToken;
+    return bearerOf(auth, auth.accessToken, auth.type === 'oidc' ? auth.idToken : undefined);
   }
   if (!auth.refreshToken) {
     throw new Error(
@@ -58,18 +63,25 @@ export async function getBearerToken(cluster: ClusterConfig): Promise<string | u
   const refreshed =
     auth.type === 'gke'
       ? await googleRefresh(auth.clientId, auth.refreshToken)
-      : await azureRefresh(auth.tenantId, auth.clientId, auth.refreshToken);
+      : auth.type === 'aks'
+        ? await azureRefresh(auth.tenantId, auth.clientId, auth.refreshToken)
+        : await oidcRefresh(auth.issuer, auth.clientId, auth.refreshToken, {
+            clientSecret: auth.clientSecret,
+            extraScopes: auth.extraScopes,
+          });
 
   const updated: AuthConfig = {
     ...auth,
     accessToken: refreshed.accessToken,
     refreshToken: refreshed.refreshToken ?? auth.refreshToken,
     expiresAt: refreshed.expiresAt,
+    ...(auth.type === 'oidc' ? { idToken: refreshed.idToken ?? auth.idToken } : {}),
   };
   authUpdateListener?.(cluster.id, updated);
+  const bearer = bearerOf(auth, refreshed.accessToken, refreshed.idToken);
   cache.set(cluster.id, {
-    token: refreshed.accessToken,
+    token: bearer,
     validUntil: refreshed.expiresAt - 60 * 1000,
   });
-  return refreshed.accessToken;
+  return bearer;
 }
