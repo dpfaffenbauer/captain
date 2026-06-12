@@ -9,22 +9,28 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "gmbh.cors.captain",
+      "bundleIdentifier": "at.pfaffenbauer.captain",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
+        "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Captain schützt gespeicherte Cluster-Zugangsdaten mit Face ID."
-      }
+      },
+      "appleTeamId": "UJ65F5V824"
     },
     "android": {
-      "package": "gmbh.cors.captain",
+      "package": "at.pfaffenbauer.captain",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#5D7BFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,6 +46,13 @@
           "cameraPermission": "Captain nutzt die Kamera, um Kubeconfig-QR-Codes zu scannen."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e1bafa8e-5344-4204-be5f-91a6ca4b98de"
+      }
+    },
+    "owner": "dpfaffenbauer"
   }
 }

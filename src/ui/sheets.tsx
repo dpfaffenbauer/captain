@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { listNamespaces } from '../kube/client';
+import { PromAlert } from '../kube/prometheus';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
 import { useClusters } from '../state/ClustersContext';
 import { ClusterConfig } from '../types';
@@ -11,6 +13,7 @@ import {
   loadAppLockSetting,
   setAppLockEnabled,
 } from '../util/applock';
+import { ageOf } from '../util/format';
 import { hapticWarning, loadHapticsSetting, setHapticsEnabled } from '../util/haptics';
 import { BottomSheet, StatusDot } from './kit';
 import { colors, radius } from './theme';
@@ -259,6 +262,92 @@ export function SettingsSheet({
   );
 }
 
+function severityColor(severity: string): string {
+  if (severity === 'critical' || severity === 'error') return colors.danger;
+  if (severity === 'warning') return colors.warning;
+  return colors.link;
+}
+
+/** Hide labels already shown as structured fields / not useful on their own. */
+const HIDDEN_ALERT_LABELS = new Set(['alertname', 'severity']);
+
+/** Full detail view for a single firing Prometheus alert. */
+export function AlertSheet({
+  visible,
+  onClose,
+  alert,
+  onOpenPod,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  alert: PromAlert | null;
+  onOpenPod?: (namespace: string, pod: string) => void;
+}) {
+  if (!alert) return null;
+  const tone = severityColor(alert.severity);
+  const since = ageOf(alert.activeAt);
+  const labelEntries = Object.entries(alert.labels)
+    .filter(([key]) => !HIDDEN_ALERT_LABELS.has(key))
+    .sort(([a], [b]) => a.localeCompare(b));
+  const canOpenPod = Boolean(alert.namespace && alert.pod && onOpenPod);
+
+  return (
+    <BottomSheet visible={visible} onClose={onClose} title={alert.name}>
+      <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 14 }}>
+        <View style={styles.alertMetaRow}>
+          <View style={[styles.severityPill, { backgroundColor: `${tone}26`, borderColor: `${tone}55` }]}>
+            <StatusDot color={tone} size={7} />
+            <Text style={[styles.severityText, { color: tone }]}>{alert.severity}</Text>
+          </View>
+          {since ? <Text style={styles.alertSince}>firing since {since}</Text> : null}
+        </View>
+
+        {alert.summary ? <Text style={styles.alertSummary}>{alert.summary}</Text> : null}
+        {alert.description ? <Text style={styles.alertDescription}>{alert.description}</Text> : null}
+        {alert.value ? (
+          <Text style={styles.alertDescription}>
+            <Text style={styles.alertValueLabel}>Value: </Text>
+            {alert.value}
+          </Text>
+        ) : null}
+
+        {labelEntries.length > 0 ? (
+          <View style={styles.settingsCard}>
+            {labelEntries.map(([key, value], index) => (
+              <View key={key} style={[styles.labelRow, index > 0 && styles.settingDivider]}>
+                <Text style={styles.labelKey}>{key}</Text>
+                <Text style={styles.labelValue} numberOfLines={1}>
+                  {value}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {canOpenPod ? (
+          <TouchableOpacity
+            style={styles.alertAction}
+            onPress={() => {
+              onClose();
+              onOpenPod?.(alert.namespace ?? '', alert.pod ?? '');
+            }}
+          >
+            <Text style={styles.alertActionText}>Open pod {alert.pod}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {alert.runbookUrl ? (
+          <TouchableOpacity
+            style={styles.alertActionGhost}
+            onPress={() => void WebBrowser.openBrowserAsync(alert.runbookUrl ?? '')}
+          >
+            <Text style={styles.alertActionGhostText}>Open runbook ↗</Text>
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
+    </BottomSheet>
+  );
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -333,4 +422,44 @@ const styles = StyleSheet.create({
   },
   signOutText: { color: colors.dangerLight, fontSize: 14, fontWeight: '600' },
   version: { color: 'rgba(242,245,250,0.3)', fontSize: 11, textAlign: 'center' },
+  alertMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  severityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  severityText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+  alertSince: { color: colors.textDim, fontSize: 12.5 },
+  alertSummary: { color: colors.text, fontSize: 15, fontWeight: '600', lineHeight: 21 },
+  alertDescription: { color: colors.textMid, fontSize: 13, lineHeight: 19 },
+  alertValueLabel: { color: colors.textDim, fontWeight: '600' },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 15,
+  },
+  labelKey: { color: colors.monoKey, fontSize: 12.5, fontWeight: '600' },
+  labelValue: { color: colors.text, fontSize: 12.5, flexShrink: 1, textAlign: 'right' },
+  alertAction: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.card,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  alertActionText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  alertActionGhost: {
+    borderWidth: 1,
+    borderColor: 'rgba(143,165,255,0.4)',
+    borderRadius: radius.card,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  alertActionGhostText: { color: colors.link, fontSize: 14, fontWeight: '600' },
 });
