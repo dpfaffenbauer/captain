@@ -8,7 +8,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { cardGradient, colors, radius, spacing } from './theme';
 
 /** Card with the soft top-to-bottom gradient used everywhere in the design. */
@@ -147,6 +147,49 @@ export function UsageBar({ percent, color }: { percent: number; color: string })
         ]}
       />
     </View>
+  );
+}
+
+/** Compact line+area chart for a metric series (Prometheus trends). */
+export function Sparkline({
+  values,
+  color,
+  width = 130,
+  height = 38,
+}: {
+  values: number[];
+  color: string;
+  width?: number;
+  height?: number;
+}) {
+  if (values.length < 2) {
+    return <View style={{ width, height }} />;
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pad = 3;
+  const innerH = height - pad * 2;
+  const stepX = width / (values.length - 1);
+  const coords = values.map((v, i) => {
+    const x = i * stepX;
+    const y = pad + innerH - ((v - min) / range) * innerH;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const line = `M${coords.join(' L')}`;
+  const area = `${line} L${width.toFixed(1)},${height} L0,${height} Z`;
+  return (
+    <Svg width={width} height={height}>
+      <Path d={area} fill={color} opacity={0.13} />
+      <Path
+        d={line}
+        stroke={color}
+        strokeWidth={2}
+        fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </Svg>
   );
 }
 

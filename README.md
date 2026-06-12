@@ -52,6 +52,13 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
 - **Live-Metriken**: Node- und Pod-Usage über die metrics-server-API
   (`metrics.k8s.io`) — CPU/Memory-Balken in der Node-Liste, CPU-Spalte in
   der Pod-Liste; ohne metrics-server blendet sich das automatisch aus.
+- **Prometheus-Integration**: Captain findet Prometheus im Cluster automatisch
+  (bekannte Service-Namen/Labels) und fragt es **über den API-Server-Proxy** ab
+  — keine zusätzliche Netzwerk- oder Auth-Konfiguration nötig, die bestehende
+  Cluster-Verbindung (CA-Trust, Token, mTLS) reicht. Im Dashboard erscheinen
+  CPU-/Memory-Verläufe der letzten Stunde als Sparklines sowie die aktuell
+  **feuernden Alerts** (nach Schweregrad sortiert, Pod-Alerts öffnen direkt die
+  Ressource). Ohne erreichbares Prometheus blendet sich alles automatisch aus.
 - **QR-Onboarding**: Kubeconfig als QR-Code scannen
   (`kubectl config view --minify --raw | qrencode -t png`).
 - **Settings-Sheet**: Default-Namespace, Haptics-Toggle (echtes Tap-Feedback
@@ -69,7 +76,8 @@ app/                          Screens (expo-router)
   cluster/[id]/item.tsx       YAML-Detail, Editor, Löschen
 src/
   auth/                       EKS-SigV4, Google/Azure-OAuth, Token-Cache
-  kube/                       Transport, Discovery, CRUD, Kubeconfig-Parser
+  kube/                       Transport, Discovery, CRUD, Kubeconfig-Parser,
+                              metrics-server + Prometheus (prometheus.ts)
   state/, storage/, ui/, util/
 modules/kube-http/            Natives iOS-Modul (Swift): TLS mit eigener CA,
                               insecure-skip-verify, mTLS via PKCS#12
