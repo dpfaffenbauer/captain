@@ -1,0 +1,123 @@
+name: Mobile
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    # Docs-only changes must not trigger an EAS build / TestFlight submit.
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        default: development
+        options: [development, preview, production]
+      platform:
+        description: "Platform"
+        type: choice
+        default: ios
+        options: [ios, android, all]
+
+# Only the newest run per ref survives: merging a second PR to main cancels
+# the in-flight build (macos-26 minutes bill 10x) so just the latest commit
+# builds & submits to TestFlight instead of racing two uploads.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
+  app-build:
+    name: App build (local — no EAS cloud)
+    # macOS runner so the build runs HERE, not on Expo's paid cloud.
+    # Pinned to macos-26 (NOT macos-latest, which is still macos-15 /
+    # Xcode 16 / iOS 18.5 SDK): App Store Connect now rejects uploads not
+    # built with the iOS 26 SDK. macos-26 ships Xcode 26.2 by default.
+    # NOTE: GitHub macOS minutes bill 10x on private repos — Expo-free,
+    # not GitHub-free. The only truly $0 path is building on your own Mac.
+    runs-on: macos-26
+    needs: [typecheck]
+    timeout-minutes: 120
+    # Push to main → build; also manual dispatch / v* tag.
+    # NOT on PRs: only the production profile has full credentials set up in
+    # EAS, so a `preview` PR build would fail at credential resolution.
+    # PRs are gated by typecheck.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || startsWith(github.ref, 'refs/tags/v')
+      || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build locally (no EAS cloud quota) + submit production to TestFlight
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          PROFILE="${{ github.event.inputs.profile || 'production' }}"
+          PLATFORM="${{ github.event.inputs.platform || 'ios' }}"
+
+          # `eas build --local` runs the SAME pipeline as EAS cloud, but on
+          # this runner — it does NOT consume the EAS cloud build quota.
+          # Credentials are still resolved from EAS via EXPO_TOKEN
+          # non-interactively (the provisioning profiles still need a
+          # one-time interactive setup). `eas submit` is free — only the
+          # cloud `eas build` is metered.
+          build_one() {
+            local plat="$1" ext="$2"
+            local out="$RUNNER_TEMP/captain-$plat.$ext"
+            eas build --local --non-interactive \
+              --platform "$plat" --profile "$PROFILE" \
+              --output "$out"
+            # Only the production profile goes to App Store Connect /
+            # TestFlight (needs submit creds in EAS + eas.json submit.production).
+            if [ "$PROFILE" = "production" ]; then
+              # --no-wait: fire-and-forget. Without it, `eas submit` polls
+              # App Store Connect until processing finishes (can take 30min+)
+              # and would burn macos-26 minutes (billed 10x). The actual
+              # upload is done in ~1min; ASC processing status is visible in
+              # the Expo dashboard and on App Store Connect.
+              eas submit --non-interactive --no-wait \
+                --platform "$plat" --profile production \
+                --path "$out"
+            fi
+          }
+
+          case "$PLATFORM" in
+            ios)     build_one ios ipa ;;
+            android) build_one android aab ;;
+            all)     build_one ios ipa; build_one android aab ;;
+            *) echo "Unknown platform: $PLATFORM" >&2; exit 1 ;;
+          esac
+# Required repository secret: EXPO_TOKEN
+#   Expo account → Settings → Access tokens → create a robot token,
+#   then add it as the EXPO_TOKEN Actions secret. Still needed here for
+#   credentials resolution and `eas submit` — NOT for paid cloud builds.
