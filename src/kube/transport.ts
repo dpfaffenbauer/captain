@@ -74,14 +74,14 @@ function describeStatus(status: number, body: string): string {
 export async function kubeRequest(
   cluster: ClusterConfig,
   path: string,
-  options: { method?: string; body?: string } = {}
+  options: { method?: string; body?: string; contentType?: string } = {}
 ): Promise<string> {
   const method = options.method ?? 'GET';
   const server = cluster.server.replace(/\/+$/, '');
   const url = `${server}${path}`;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (options.body) headers['Content-Type'] = 'application/json';
+  if (options.body) headers['Content-Type'] = options.contentType ?? 'application/json';
   const token = await getBearerToken(cluster);
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -106,7 +106,7 @@ export async function kubeRequest(
 export async function kubeRequestJson<T = unknown>(
   cluster: ClusterConfig,
   path: string,
-  options: { method?: string; body?: string } = {}
+  options: { method?: string; body?: string; contentType?: string } = {}
 ): Promise<T> {
   const body = await kubeRequest(cluster, path, options);
   return JSON.parse(body) as T;

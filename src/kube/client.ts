@@ -131,6 +131,95 @@ export async function deleteResource(
   });
 }
 
+/** Scales a workload via the /scale subresource (Deployment, STS, RS, RC). */
+export async function scaleResource(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  replicas: number,
+  namespace?: string
+): Promise<void> {
+  await kubeRequest(
+    cluster,
+    `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}/scale`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ spec: { replicas } }),
+      contentType: 'application/merge-patch+json',
+    }
+  );
+}
+
+/** Triggers a rolling restart like `kubectl rollout restart`. */
+export async function restartRollout(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  namespace?: string
+): Promise<void> {
+  const patch = {
+    spec: {
+      template: {
+        metadata: {
+          annotations: { 'kubectl.kubernetes.io/restartedAt': new Date().toISOString() },
+        },
+      },
+    },
+  };
+  await kubeRequest(cluster, `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+    contentType: 'application/strategic-merge-patch+json',
+  });
+}
+
+export interface ResourceEvent {
+  type: string;
+  reason: string;
+  message: string;
+  count?: number;
+  lastTimestamp?: string;
+}
+
+/** Events that reference the given object (kubectl describe style). */
+export async function listEventsFor(
+  cluster: ClusterConfig,
+  kind: string,
+  name: string,
+  namespace?: string
+): Promise<ResourceEvent[]> {
+  const fieldSelector = encodeURIComponent(
+    `involvedObject.name=${name},involvedObject.kind=${kind}`
+  );
+  const path = namespace
+    ? `/api/v1/namespaces/${encodeURIComponent(namespace)}/events?fieldSelector=${fieldSelector}&limit=50`
+    : `/api/v1/events?fieldSelector=${fieldSelector}&limit=50`;
+  const body = await kubeRequestJson<{ items?: any[] }>(cluster, path);
+  return (body.items ?? []).map((item) => ({
+    type: item.type ?? '',
+    reason: item.reason ?? '',
+    message: item.message ?? '',
+    count: item.count,
+    lastTimestamp: item.lastTimestamp ?? item.eventTime,
+  }));
+}
+
+export async function getPodLogs(
+  cluster: ClusterConfig,
+  namespace: string,
+  name: string,
+  options: { container?: string; tailLines?: number; previous?: boolean } = {}
+): Promise<string> {
+  const params = new URLSearchParams();
+  params.set('tailLines', String(options.tailLines ?? 500));
+  if (options.container) params.set('container', options.container);
+  if (options.previous) params.set('previous', 'true');
+  return kubeRequest(
+    cluster,
+    `/api/v1/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(name)}/log?${params.toString()}`
+  );
+}
+
 export async function listNamespaces(cluster: ClusterConfig): Promise<string[]> {
   const body = await kubeRequestJson<{ items?: Array<{ metadata?: { name?: string } }> }>(
     cluster,

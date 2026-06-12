@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="cluster/[id]/index" options={{ title: 'Ressourcen' }} />
         <Stack.Screen name="cluster/[id]/list" options={{ title: 'Liste' }} />
         <Stack.Screen name="cluster/[id]/item" options={{ title: 'Details' }} />
+        <Stack.Screen name="cluster/[id]/logs" options={{ title: 'Logs' }} />
       </Stack>
     </ClustersProvider>
   );
