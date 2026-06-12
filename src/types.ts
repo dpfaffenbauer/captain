@@ -86,4 +86,6 @@ export interface KubeListItem {
 export interface KubeList {
   items: KubeListItem[];
   continueToken?: string;
+  /** List resourceVersion — the starting point for a watch. */
+  resourceVersion?: string;
 }

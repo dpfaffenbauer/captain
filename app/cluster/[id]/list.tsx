@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { listResources, restartRollout, scaleResource } from '../../../src/kube/client';
+import { KubeStreamHandle } from '../../../src/kube/stream';
+import { isWatchAvailable, watchResources } from '../../../src/kube/watch';
 import {
   formatCpuUsage,
   formatMemoryUsage,
@@ -57,6 +59,15 @@ function podRestarts(raw: any): number {
   );
 }
 
+/** Problems first, like the design. */
+function sortPodsBySeverity(items: KubeListItem[]): KubeListItem[] {
+  const rank = (item: KubeListItem) => {
+    const sev = podSeverity(item.raw as any);
+    return sev.color === colors.danger ? 0 : sev.color === colors.warning ? 1 : 2;
+  };
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}
+
 export default function ResourceListScreen() {
   const params = useLocalSearchParams<{
     id: string;
@@ -92,10 +103,23 @@ export default function ResourceListScreen() {
   const [error, setError] = useState('');
   const [nsOpen, setNsOpen] = useState(false);
   const [usage, setUsage] = useState<Map<string, ResourceUsage> | null>(null);
+  const [live, setLive] = useState(false);
 
   const isPods = type.group === '' && type.kind === 'Pod';
   const isDeployments = type.group === 'apps' && type.kind === 'Deployment';
   const isNodes = type.group === '' && type.kind === 'Node';
+
+  // Each (re)load invalidates the previous watch; the generation counter
+  // makes late events from an old stream harmless.
+  const watchRef = useRef<KubeStreamHandle | null>(null);
+  const watchGeneration = useRef(0);
+
+  const stopWatch = useCallback(() => {
+    watchGeneration.current += 1;
+    watchRef.current?.stop();
+    watchRef.current = null;
+    setLive(false);
+  }, []);
 
   const load = useCallback(
     async (reset: boolean, token?: string) => {
@@ -108,17 +132,11 @@ export default function ResourceListScreen() {
         });
         let next = reset ? result.items : [...items, ...result.items];
         if (isPods) {
-          // Problems first, like the design.
-          next = [...next].sort((a, b) => {
-            const rank = (item: KubeListItem) => {
-              const sev = podSeverity(item.raw as any);
-              return sev.color === colors.danger ? 0 : sev.color === colors.warning ? 1 : 2;
-            };
-            return rank(a) - rank(b);
-          });
+          next = sortPodsBySeverity(next);
         }
         setItems(next);
         setContinueToken(result.continueToken);
+        if (reset) startWatch(result.resourceVersion);
         // Live usage from the metrics-server, when installed.
         if (isPods) {
           void getPodMetrics(cluster, type.namespaced && namespace !== '' ? namespace : undefined).then(setUsage);
@@ -136,11 +154,66 @@ export default function ResourceListScreen() {
     [cluster, type, namespace]
   );
 
+  /** Keeps the list in sync via the watch API (only with the native build). */
+  const startWatch = useCallback(
+    (resourceVersion: string | undefined) => {
+      stopWatch();
+      if (!cluster || !resourceVersion || !isWatchAvailable()) return;
+      const generation = watchGeneration.current;
+      const keyOf = (item: KubeListItem) => `${item.namespace ?? ''}/${item.name}`;
+      watchResources(
+        cluster,
+        type,
+        {
+          namespace: type.namespaced && namespace !== '' ? namespace : undefined,
+          resourceVersion,
+        },
+        {
+          onEvent: (event) => {
+            if (watchGeneration.current !== generation) return;
+            setItems((current) => {
+              const key = keyOf(event.item);
+              if (event.type === 'DELETED') {
+                return current.filter((entry) => keyOf(entry) !== key);
+              }
+              const index = current.findIndex((entry) => keyOf(entry) === key);
+              const next =
+                index >= 0
+                  ? [...current.slice(0, index), event.item, ...current.slice(index + 1)]
+                  : [...current, event.item];
+              return isPods ? sortPodsBySeverity(next) : next;
+            });
+          },
+          onStale: () => {
+            // resourceVersion expired or connection dropped: re-list.
+            if (watchGeneration.current !== generation) return;
+            void load(true);
+          },
+          onEnd: () => {
+            if (watchGeneration.current === generation) setLive(false);
+          },
+        }
+      )
+        .then((handle) => {
+          if (watchGeneration.current !== generation) {
+            handle.stop();
+            return;
+          }
+          watchRef.current = handle;
+          setLive(true);
+        })
+        .catch(() => setLive(false));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cluster, type, namespace, isPods, stopWatch]
+  );
+
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       void load(true);
-    }, [load])
+      return stopWatch;
+    }, [load, stopWatch])
   );
 
   const visibleItems = useMemo(() => {
@@ -386,9 +459,17 @@ export default function ResourceListScreen() {
           autoCorrect={false}
         />
       </View>
-      <Text style={styles.meta}>
-        {visibleItems.length} shown{isPods ? ' · problems first' : ''}
-      </Text>
+      <View style={styles.metaRow}>
+        <Text style={styles.meta}>
+          {visibleItems.length} shown{isPods ? ' · problems first' : ''}
+        </Text>
+        {live ? (
+          <View style={styles.liveTag}>
+            <StatusDot color={colors.success} size={6} />
+            <Text style={styles.liveText}>live</Text>
+          </View>
+        ) : null}
+      </View>
 
       {error ? (
         <View style={{ padding: spacing.lg }}>
@@ -455,7 +536,16 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
   },
-  meta: { color: colors.textFaint, fontSize: 11.5, paddingHorizontal: 18, paddingBottom: 10 },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+  },
+  meta: { color: colors.textFaint, fontSize: 11.5 },
+  liveTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  liveText: { color: colors.success, fontSize: 10.5, fontWeight: '700' },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: 60, gap: 9 },
   itemName: { color: colors.text, fontSize: 13.5, fontWeight: '600' },
   podCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },

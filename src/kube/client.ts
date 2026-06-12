@@ -83,7 +83,7 @@ export async function listResources(
 
   const body = await kubeRequestJson<{
     items?: Array<{ metadata?: { name?: string; namespace?: string; creationTimestamp?: string } }>;
-    metadata?: { continue?: string };
+    metadata?: { continue?: string; resourceVersion?: string };
   }>(cluster, `${resourceBasePath(type, options.namespace)}?${params.toString()}`);
 
   const items: KubeListItem[] = (body.items ?? []).map((item) => ({
@@ -92,7 +92,11 @@ export async function listResources(
     creationTimestamp: item.metadata?.creationTimestamp,
     raw: item as Record<string, unknown>,
   }));
-  return { items, continueToken: body.metadata?.continue || undefined };
+  return {
+    items,
+    continueToken: body.metadata?.continue || undefined,
+    resourceVersion: body.metadata?.resourceVersion || undefined,
+  };
 }
 
 export async function getResource(
