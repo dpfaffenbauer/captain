@@ -43,6 +43,8 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-local-authentication",
+      "expo-background-task",
+      "expo-notifications",
       "@bacons/apple-targets",
       [
         "expo-camera",

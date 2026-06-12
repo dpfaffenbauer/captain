@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { syncBackgroundAlerts } from '../src/background/alerts';
 import { ClustersProvider } from '../src/state/ClustersContext';
 import { colors } from '../src/ui/theme';
 import { authenticate, loadAppLockSetting } from '../src/util/applock';
@@ -71,6 +72,7 @@ function AppLockGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   useEffect(() => {
     void loadHapticsSetting();
+    void syncBackgroundAlerts();
   }, []);
   return (
     <ClustersProvider>
