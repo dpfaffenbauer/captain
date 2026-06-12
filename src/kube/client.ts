@@ -204,6 +204,37 @@ export async function listEventsFor(
   }));
 }
 
+export interface ClusterEvent extends ResourceEvent {
+  /** "kind/name" of the involved object. */
+  object: string;
+  namespace?: string;
+}
+
+/** Recent events, cluster-wide or per namespace, newest first. */
+export async function listClusterEvents(
+  cluster: ClusterConfig,
+  namespace?: string,
+  limit = 100
+): Promise<ClusterEvent[]> {
+  const path = namespace
+    ? `/api/v1/namespaces/${encodeURIComponent(namespace)}/events?limit=${limit}`
+    : `/api/v1/events?limit=${limit}`;
+  const body = await kubeRequestJson<{ items?: any[] }>(cluster, path);
+  const events = (body.items ?? []).map((item) => ({
+    type: item.type ?? '',
+    reason: item.reason ?? '',
+    message: item.message ?? '',
+    count: item.count,
+    lastTimestamp: item.lastTimestamp ?? item.eventTime ?? item.metadata?.creationTimestamp,
+    namespace: item.involvedObject?.namespace ?? item.metadata?.namespace,
+    object: item.involvedObject
+      ? `${String(item.involvedObject.kind ?? '').toLowerCase()}/${item.involvedObject.name ?? ''}`
+      : '',
+  }));
+  events.sort((a, b) => Date.parse(b.lastTimestamp ?? '') - Date.parse(a.lastTimestamp ?? ''));
+  return events;
+}
+
 export async function getPodLogs(
   cluster: ClusterConfig,
   namespace: string,

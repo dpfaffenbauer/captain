@@ -1,33 +1,75 @@
+import { categoryColors } from '../ui/theme';
 import { ApiResourceType } from '../types';
 
 export interface ResourceCategory {
   key: string;
   title: string;
-  icon: string;
+  color: string;
   /** Resource types in curated order. */
   types: ApiResourceType[];
   /** Collapsed by default in the UI. */
   collapsedByDefault?: boolean;
 }
 
+/** kubectl-style two/three-letter abbreviations from the design. */
+const ABBREVIATIONS: Record<string, string> = {
+  '/Pod': 'Po',
+  'apps/Deployment': 'De',
+  'apps/StatefulSet': 'St',
+  'apps/DaemonSet': 'Ds',
+  'apps/ReplicaSet': 'Rs',
+  '/ReplicationController': 'Rc',
+  'batch/Job': 'Jo',
+  'batch/CronJob': 'Cj',
+  '/ConfigMap': 'Cm',
+  '/Secret': 'Se',
+  '/ResourceQuota': 'Rq',
+  '/LimitRange': 'Lr',
+  'autoscaling/HorizontalPodAutoscaler': 'Ha',
+  'policy/PodDisruptionBudget': 'Pb',
+  'scheduling.k8s.io/PriorityClass': 'Pc',
+  'node.k8s.io/RuntimeClass': 'Rt',
+  'coordination.k8s.io/Lease': 'Le',
+  'admissionregistration.k8s.io/MutatingWebhookConfiguration': 'Mw',
+  'admissionregistration.k8s.io/ValidatingWebhookConfiguration': 'Vw',
+  '/Service': 'Sv',
+  'discovery.k8s.io/EndpointSlice': 'Es',
+  '/Endpoints': 'Ep',
+  'networking.k8s.io/Ingress': 'In',
+  'networking.k8s.io/IngressClass': 'Ic',
+  'networking.k8s.io/NetworkPolicy': 'Np',
+  '/PersistentVolumeClaim': 'Pvc',
+  '/PersistentVolume': 'Pv',
+  'storage.k8s.io/StorageClass': 'Sc',
+  '/Node': 'No',
+  '/Namespace': 'Ns',
+  '/Event': 'Ev',
+  '/ServiceAccount': 'Sa',
+  'rbac.authorization.k8s.io/Role': 'Ro',
+  'rbac.authorization.k8s.io/RoleBinding': 'Rb',
+  'rbac.authorization.k8s.io/ClusterRole': 'Cr',
+  'rbac.authorization.k8s.io/ClusterRoleBinding': 'Cb',
+  'apiextensions.k8s.io/CustomResourceDefinition': 'Crd',
+};
+
+export function abbreviationFor(type: ApiResourceType): string {
+  const exact = ABBREVIATIONS[`${type.group}/${type.kind}`];
+  if (exact) return exact;
+  const upper = type.kind.replace(/[^A-Z]/g, '');
+  if (upper.length >= 2) return upper.slice(0, 2)[0] + upper.slice(1, 2).toLowerCase();
+  return type.kind.slice(0, 2).replace(/^./, (c) => c.toUpperCase());
+}
+
 /** Curated category definitions, matched by "group/Kind". Order matters. */
 const CATEGORY_DEFS: Array<{
   key: string;
   title: string;
-  icon: string;
   members: string[];
   collapsedByDefault?: boolean;
 }> = [
   {
-    key: 'cluster',
-    title: 'Cluster',
-    icon: '🖥',
-    members: ['/Node', '/Namespace', '/Event'],
-  },
-  {
     key: 'workloads',
     title: 'Workloads',
-    icon: '⚙️',
     members: [
       '/Pod',
       'apps/Deployment',
@@ -42,7 +84,6 @@ const CATEGORY_DEFS: Array<{
   {
     key: 'config',
     title: 'Config',
-    icon: '🔧',
     members: [
       '/ConfigMap',
       '/Secret',
@@ -59,8 +100,7 @@ const CATEGORY_DEFS: Array<{
   },
   {
     key: 'network',
-    title: 'Netzwerk',
-    icon: '🌐',
+    title: 'Network',
     members: [
       '/Service',
       'discovery.k8s.io/EndpointSlice',
@@ -73,7 +113,6 @@ const CATEGORY_DEFS: Array<{
   {
     key: 'storage',
     title: 'Storage',
-    icon: '💾',
     members: [
       '/PersistentVolumeClaim',
       '/PersistentVolume',
@@ -81,9 +120,13 @@ const CATEGORY_DEFS: Array<{
     ],
   },
   {
+    key: 'cluster',
+    title: 'Cluster',
+    members: ['/Node', '/Namespace', '/Event'],
+  },
+  {
     key: 'access',
-    title: 'Zugriffskontrolle',
-    icon: '🔐',
+    title: 'Access Control',
     members: [
       '/ServiceAccount',
       'rbac.authorization.k8s.io/Role',
@@ -114,7 +157,7 @@ function keyOf(type: ApiResourceType): string {
 /**
  * Sorts discovered resource types into the curated categories. Anything from
  * a non-builtin API group becomes a custom resource (grouped by API group);
- * remaining builtin types land in "Sonstiges".
+ * remaining builtin types land in "Other".
  */
 export function categorizeResourceTypes(types: ApiResourceType[]): ResourceCategory[] {
   const byKey = new Map<string, ApiResourceType>();
@@ -139,7 +182,7 @@ export function categorizeResourceTypes(types: ApiResourceType[]): ResourceCateg
       categories.push({
         key: def.key,
         title: def.title,
-        icon: def.icon,
+        color: categoryColors[def.key],
         types: members,
         collapsedByDefault: def.collapsedByDefault,
       });
@@ -169,13 +212,18 @@ export function categorizeResourceTypes(types: ApiResourceType[]): ResourceCateg
   other.sort((a, b) => a.kind.localeCompare(b.kind) || a.group.localeCompare(b.group));
 
   if (custom.length > 0) {
-    categories.push({ key: 'custom', title: 'Custom Resources', icon: '🧩', types: custom });
+    categories.push({
+      key: 'custom',
+      title: 'Custom Resources',
+      color: categoryColors.custom,
+      types: custom,
+    });
   }
   if (other.length > 0) {
     categories.push({
       key: 'other',
-      title: 'Sonstiges',
-      icon: '📦',
+      title: 'Other',
+      color: categoryColors.other,
       types: other,
       collapsedByDefault: true,
     });

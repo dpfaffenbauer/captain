@@ -7,6 +7,11 @@ löschen. Authentifizierung wird für die großen Cloud-Anbieter (AWS EKS,
 Google GKE, Azure AKS) sowie für Bearer-Tokens und Client-Zertifikate
 unterstützt.
 
+Das UI folgt dem Screendesign **„Captain v2 · Soft Bridge"** (Claude-Design-
+Handoff): dunkles Indigo-Theme, Karten mit sanftem Verlauf, Squircle-Icons im
+iOS-Settings-Stil, Health-Ring-Dashboard, Floating-Tab-Bar (Cluster · Browse ·
+Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
+
 ## Features
 
 - **Multi-Cluster**: beliebig viele Cluster, sicher gespeichert im iOS-Keychain

@@ -10,19 +10,17 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
+          headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.text,
           headerTitleStyle: { color: colors.text },
+          headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Captain' }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="cluster-form" options={{ title: 'Cluster' }} />
         <Stack.Screen name="kubeconfig-import" options={{ title: 'Kubeconfig importieren' }} />
-        <Stack.Screen name="cluster/[id]/index" options={{ title: 'Ressourcen' }} />
-        <Stack.Screen name="cluster/[id]/list" options={{ title: 'Liste' }} />
-        <Stack.Screen name="cluster/[id]/item" options={{ title: 'Details' }} />
-        <Stack.Screen name="cluster/[id]/logs" options={{ title: 'Logs' }} />
+        <Stack.Screen name="cluster/[id]" options={{ headerShown: false }} />
       </Stack>
     </ClustersProvider>
   );
