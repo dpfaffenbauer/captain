@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { publishWidgetSnapshot, WidgetClusterEntry } from '../modules/captain-widget';
 import { ClusterHealth, getClusterHealth, healthTone } from '../src/kube/health';
 import { useClusters } from '../src/state/ClustersContext';
 import { ClusterConfig } from '../src/types';
@@ -97,6 +98,23 @@ export default function HomeScreen() {
       };
     }, [clusters])
   );
+
+  // Mirror every finished probe to the home-screen widget.
+  useEffect(() => {
+    const entries: WidgetClusterEntry[] = [];
+    for (const cluster of clusters) {
+      const clusterHealth = health[cluster.id];
+      if (!clusterHealth) continue;
+      entries.push({
+        name: cluster.name,
+        tone: healthTone(clusterHealth),
+        summary: healthSummary(clusterHealth) ?? '',
+      });
+    }
+    if (entries.length > 0) {
+      publishWidgetSnapshot({ clusters: entries, updatedAt: Math.floor(Date.now() / 1000) });
+    }
+  }, [clusters, health]);
 
   if (loading) return <Loading />;
 

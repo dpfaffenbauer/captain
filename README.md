@@ -52,6 +52,11 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
 - **Multi-Cluster-Dashboard**: Der Home-Screen prüft alle Cluster parallel
   (Node-Readiness, Problem-Pods) und zeigt Ampel-Status plus Kurzzusammen-
   fassung pro Cluster.
+- **Home-Screen-Widget** (WidgetKit): Small/Medium-Widget mit dem
+  Health-Status aller Cluster (Ampel pro Cluster, „x/y clusters healthy").
+  Die App schreibt bei jedem Health-Check einen Snapshot in die App Group
+  (`group.at.pfaffenbauer.captain`) und stößt den Widget-Reload an; das
+  Widget zeigt also den Stand des letzten App-Starts.
 - **Face-ID-App-Lock** (optional): verbirgt die App-Inhalte bei Kaltstart und
   Rückkehr aus dem Hintergrund, bis Face ID/Touch ID bzw. der Geräte-Code
   bestätigt wurde.
@@ -135,6 +140,12 @@ npx expo run:ios          # erstellt den iOS-Build inkl. nativem KubeHttp-Modul
 
 Für ein Gerät statt Simulator: in Xcode Signing-Team setzen oder
 `npx expo run:ios --device`.
+
+> **Widget:** Die Widget-Extension (`targets/widget`) wird beim Prebuild von
+> `@bacons/apple-targets` als eigenes Target erzeugt. Fürs Gerät braucht die
+> Extension ein Signing-Team — entweder in Xcode setzen oder in `app.json`
+> dem Plugin mitgeben: `["@bacons/apple-targets", { "appleTeamId": "ABCDE12345" }]`.
+> App und Widget teilen sich die App Group `group.at.pfaffenbauer.captain`.
 
 ## Authentifizierung einrichten
 

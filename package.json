@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@bacons/apple-targets": "^4.0.7",
     "@types/pako": "^2.0.4",
     "crypto-js": "^4.2.0",
     "expo": "~56.0.11",
