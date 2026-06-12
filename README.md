@@ -7,12 +7,24 @@ löschen. Authentifizierung wird für die großen Cloud-Anbieter (AWS EKS,
 Google GKE, Azure AKS) sowie für Bearer-Tokens und Client-Zertifikate
 unterstützt.
 
+Das UI folgt dem Screendesign **„Captain v2 · Soft Bridge"** (Claude-Design-
+Handoff): dunkles Indigo-Theme, Karten mit sanftem Verlauf, Squircle-Icons im
+iOS-Settings-Stil, Health-Ring-Dashboard, Floating-Tab-Bar (Cluster · Browse ·
+Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
+
 ## Features
 
 - **Multi-Cluster**: beliebig viele Cluster, sicher gespeichert im iOS-Keychain
   (expo-secure-store).
 - **Alle Ressourcen-Typen**: dynamische Discovery über `/api/v1` und `/apis/…`
   — Pods, Deployments, CRDs, alles was der API-Server kennt.
+- **Kuratierte Übersicht** (à la Lens): auf-/zuklappbare Kategorien — Cluster
+  (Nodes, Namespaces, Events), Workloads (Pods, Deployments, StatefulSets,
+  DaemonSets, ReplicaSets, Jobs, CronJobs …), Config (Secrets, ConfigMaps,
+  Quotas, HPA, PDB, Webhooks …), Netzwerk (Services, Ingresses,
+  EndpointSlices, NetworkPolicies …), Storage (PVC, PV, StorageClasses),
+  Zugriffskontrolle (ServiceAccounts, RBAC) sowie **Custom Resources**
+  automatisch gruppiert nach API-Gruppe; alles Übrige unter „Sonstiges".
 - **Lesen, Bearbeiten, Löschen**: Listen mit Namespace-Filter, Pagination und
   Suche; Detailansicht als YAML; Bearbeiten im YAML-Editor (PUT/replace);
   Löschen mit Bestätigung.
@@ -31,6 +43,19 @@ unterstützt.
   Server-Zertifikate gegen die in der Kubeconfig hinterlegte CA
   (`certificate-authority-data`) — nötig, weil EKS/GKE/AKS-Endpunkte von
   cluster-eigenen CAs signiert sind.
+- **Exec-Terminal**: One-Shot-Kommandos via `kubectl exec`-WebSocket
+  (`v4.channel.k8s.io`), nativ mit Cluster-CA-Trust — inkl. Quick-Command-
+  Chips im Terminal-UI.
+- **Port-Forwarding**: lokaler TCP-Listener (Network.framework) bridgt auf
+  den `portforward`-WebSocket-Endpunkt; aktive Forwards erscheinen im
+  Browse-Tab unter Network und sind einzeln stoppbar.
+- **Live-Metriken**: Node- und Pod-Usage über die metrics-server-API
+  (`metrics.k8s.io`) — CPU/Memory-Balken in der Node-Liste, CPU-Spalte in
+  der Pod-Liste; ohne metrics-server blendet sich das automatisch aus.
+- **QR-Onboarding**: Kubeconfig als QR-Code scannen
+  (`kubectl config view --minify --raw | qrencode -t png`).
+- **Settings-Sheet**: Default-Namespace, Haptics-Toggle (echtes Tap-Feedback
+  bei destruktiven Aktionen), Cluster bearbeiten, Sign-out aus allen Clustern.
 
 ## Projektstruktur
 
@@ -137,6 +162,7 @@ base64 -i client.p12 | pbcopy
 - Kubeconfig-`exec`-Plugins können nicht ausgeführt werden (kein Subprozess auf
   iOS); der Import mappt sie auf die nativen Auth-Methoden und markiert
   fehlende Felder.
-- Pod-Logs, `exec` und Watch-Streams sind noch nicht implementiert.
+- Exec führt One-Shot-Kommandos aus (`/bin/sh -c …`), kein interaktives TTY.
+- Log-Follow pollt den Tail (3 s), kein echter `follow`-Stream.
 - Bearbeiten nutzt PUT (replace); bei Konflikten (HTTP 409) neu laden und
   erneut speichern.

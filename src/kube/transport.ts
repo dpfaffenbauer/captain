@@ -1,4 +1,4 @@
-import { isNativeTransportAvailable, nativeRequest } from '../../modules/kube-http';
+import { isNativeTransportAvailable, nativeRequest, TlsOptions } from '../../modules/kube-http';
 import { getBearerToken, invalidateToken } from '../auth/tokens';
 import { ClusterConfig } from '../types';
 import { base64Decode, looksLikeBase64 } from '../util/base64';
@@ -28,6 +28,18 @@ function pemOf(data: string | undefined): string | undefined {
   return trimmed;
 }
 
+/** TLS options for the native transport, shared by request, exec, and port forwarding. */
+export function tlsOptionsOf(cluster: ClusterConfig): TlsOptions {
+  return {
+    caPem: pemOf(cluster.caData),
+    insecure: cluster.insecureSkipTlsVerify === true,
+    clientCertPem: pemOf(cluster.clientCertData),
+    clientKeyPem: pemOf(cluster.clientKeyData),
+    pkcs12: cluster.clientP12,
+    pkcs12Password: cluster.clientP12Password,
+  };
+}
+
 async function rawRequest(
   cluster: ClusterConfig,
   url: string,
@@ -41,12 +53,7 @@ async function rawRequest(
       method,
       headers,
       body,
-      caPem: pemOf(cluster.caData),
-      insecure: cluster.insecureSkipTlsVerify === true,
-      clientCertPem: pemOf(cluster.clientCertData),
-      clientKeyPem: pemOf(cluster.clientKeyData),
-      pkcs12: cluster.clientP12,
-      pkcs12Password: cluster.clientP12Password,
+      ...tlsOptionsOf(cluster),
       timeoutMs: 30000,
     });
     return { status: response.status, body: response.body };
@@ -76,14 +83,14 @@ function describeStatus(status: number, body: string): string {
 export async function kubeRequest(
   cluster: ClusterConfig,
   path: string,
-  options: { method?: string; body?: string } = {}
+  options: { method?: string; body?: string; contentType?: string } = {}
 ): Promise<string> {
   const method = options.method ?? 'GET';
   const server = cluster.server.replace(/\/+$/, '');
   const url = `${server}${path}`;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (options.body) headers['Content-Type'] = 'application/json';
+  if (options.body) headers['Content-Type'] = options.contentType ?? 'application/json';
   const token = await getBearerToken(cluster);
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -108,7 +115,7 @@ export async function kubeRequest(
 export async function kubeRequestJson<T = unknown>(
   cluster: ClusterConfig,
   path: string,
-  options: { method?: string; body?: string } = {}
+  options: { method?: string; body?: string; contentType?: string } = {}
 ): Promise<T> {
   const body = await kubeRequest(cluster, path, options);
   return JSON.parse(body) as T;
