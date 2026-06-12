@@ -1,0 +1,117 @@
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
+
+export interface OAuthTokens {
+  accessToken: string;
+  refreshToken?: string;
+  /** Unix epoch milliseconds. */
+  expiresAt: number;
+}
+
+const GOOGLE_DISCOVERY: AuthSession.DiscoveryDocument = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+};
+
+/** Scope of the AKS AAD server application (fixed ID for all AKS clusters). */
+export const AKS_SERVER_APP_ID = '6dae42f8-4368-4678-94ff-3960e28e3630';
+
+function azureDiscovery(tenantId: string): AuthSession.DiscoveryDocument {
+  const base = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0`;
+  return { authorizationEndpoint: `${base}/authorize`, tokenEndpoint: `${base}/token` };
+}
+
+function toTokens(response: AuthSession.TokenResponse, previousRefreshToken?: string): OAuthTokens {
+  return {
+    accessToken: response.accessToken,
+    refreshToken: response.refreshToken ?? previousRefreshToken,
+    expiresAt: (response.issuedAt + (response.expiresIn ?? 300)) * 1000,
+  };
+}
+
+/**
+ * Redirect URI for a Google iOS OAuth client: the reversed client ID scheme.
+ * Example: 123-abc.apps.googleusercontent.com → com.googleusercontent.apps.123-abc:/oauth2redirect
+ */
+export function googleRedirectUri(clientId: string): string {
+  const reversed = clientId.replace(/\.apps\.googleusercontent\.com$/, '');
+  return `com.googleusercontent.apps.${reversed}:/oauth2redirect`;
+}
+
+export function azureRedirectUri(): string {
+  return AuthSession.makeRedirectUri({ scheme: 'captain', path: 'oauth' });
+}
+
+async function signIn(
+  clientId: string,
+  scopes: string[],
+  redirectUri: string,
+  discovery: AuthSession.DiscoveryDocument,
+  extraParams?: Record<string, string>
+): Promise<OAuthTokens> {
+  const request = new AuthSession.AuthRequest({
+    clientId,
+    scopes,
+    redirectUri,
+    responseType: AuthSession.ResponseType.Code,
+    usePKCE: true,
+    extraParams,
+  });
+  const result = await request.promptAsync(discovery);
+  if (result.type !== 'success' || !result.params.code) {
+    throw new Error(
+      result.type === 'error'
+        ? result.error?.message ?? 'Anmeldung fehlgeschlagen'
+        : 'Anmeldung abgebrochen'
+    );
+  }
+  const tokenResponse = await AuthSession.exchangeCodeAsync(
+    {
+      clientId,
+      code: result.params.code,
+      redirectUri,
+      extraParams: request.codeVerifier ? { code_verifier: request.codeVerifier } : undefined,
+    },
+    discovery
+  );
+  return toTokens(tokenResponse);
+}
+
+export async function googleSignIn(clientId: string): Promise<OAuthTokens> {
+  return signIn(
+    clientId,
+    ['openid', 'https://www.googleapis.com/auth/cloud-platform'],
+    googleRedirectUri(clientId),
+    GOOGLE_DISCOVERY,
+    // Ask Google for a refresh token so the session survives token expiry.
+    { access_type: 'offline', prompt: 'consent' }
+  );
+}
+
+export async function googleRefresh(clientId: string, refreshToken: string): Promise<OAuthTokens> {
+  const response = await AuthSession.refreshAsync({ clientId, refreshToken }, GOOGLE_DISCOVERY);
+  return toTokens(response, refreshToken);
+}
+
+export async function azureSignIn(tenantId: string, clientId: string): Promise<OAuthTokens> {
+  return signIn(
+    clientId,
+    ['openid', 'offline_access', `${AKS_SERVER_APP_ID}/user.read`],
+    azureRedirectUri(),
+    azureDiscovery(tenantId)
+  );
+}
+
+export async function azureRefresh(
+  tenantId: string,
+  clientId: string,
+  refreshToken: string
+): Promise<OAuthTokens> {
+  const response = await AuthSession.refreshAsync(
+    { clientId, refreshToken, scopes: ['openid', 'offline_access', `${AKS_SERVER_APP_ID}/user.read`] },
+    azureDiscovery(tenantId)
+  );
+  return toTokens(response, refreshToken);
+}
