@@ -187,6 +187,10 @@ export interface PromAlert {
   severity: string;
   state: string;
   summary?: string;
+  description?: string;
+  runbookUrl?: string;
+  /** The series value that tripped the rule, as a string. */
+  value?: string;
   activeAt?: string;
   namespace?: string;
   pod?: string;
@@ -216,11 +220,15 @@ export async function getFiringAlerts(
     .filter((a) => a.state === 'firing')
     .map<PromAlert>((a) => {
       const labels = a.labels ?? {};
+      const annotations = a.annotations ?? {};
       return {
         name: labels.alertname ?? 'Alert',
         severity: labels.severity ?? 'warning',
         state: a.state ?? 'firing',
-        summary: a.annotations?.summary ?? a.annotations?.description,
+        summary: annotations.summary ?? annotations.message,
+        description: annotations.description,
+        runbookUrl: annotations.runbook_url,
+        value: a.value,
         activeAt: a.activeAt,
         namespace: labels.namespace,
         pod: labels.pod,
