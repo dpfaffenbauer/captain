@@ -37,6 +37,8 @@ export default function ClusterFormScreen() {
   const [server, setServer] = useState(existing?.server ?? '');
   const [caData, setCaData] = useState(existing?.caData ?? '');
   const [insecure, setInsecure] = useState(existing?.insecureSkipTlsVerify ?? false);
+  const [clientCertData, setClientCertData] = useState(existing?.clientCertData ?? '');
+  const [clientKeyData, setClientKeyData] = useState(existing?.clientKeyData ?? '');
   const [clientP12, setClientP12] = useState(existing?.clientP12 ?? '');
   const [clientP12Password, setClientP12Password] = useState(existing?.clientP12Password ?? '');
 
@@ -73,6 +75,8 @@ export default function ClusterFormScreen() {
       server: server.trim(),
       caData: caData.trim() || undefined,
       insecureSkipTlsVerify: insecure || undefined,
+      clientCertData: clientCertData.trim() || undefined,
+      clientKeyData: clientKeyData.trim() || undefined,
       clientP12: clientP12.trim() || undefined,
       clientP12Password: clientP12Password || undefined,
     };
@@ -124,8 +128,11 @@ export default function ClusterFormScreen() {
       return 'Bitte eine gültige API-Server-URL angeben (https://…).';
     }
     if (authType === 'token' && !token.trim()) return 'Bitte ein Bearer-Token angeben.';
-    if (authType === 'clientCert' && !clientP12.trim()) {
-      return 'Für Zertifikats-Auth wird ein PKCS#12-Bundle (base64) benötigt.';
+    if (authType === 'clientCert') {
+      const hasPemPair = clientCertData.trim().length > 0 && clientKeyData.trim().length > 0;
+      if (!hasPemPair && !clientP12.trim()) {
+        return 'Für Zertifikats-Auth bitte Client-Zertifikat und Key angeben (PEM oder base64, wie in der Kubeconfig).';
+      }
     }
     if (authType === 'eks' && (!eksRegion.trim() || !eksClusterName.trim() || !eksAccessKeyId.trim() || !eksSecretAccessKey.trim())) {
       return 'Für EKS werden Region, Cluster-Name, Access Key und Secret Key benötigt.';
@@ -302,10 +309,27 @@ export default function ClusterFormScreen() {
           </>
         )}
 
-        {(authType === 'clientCert' || clientP12.length > 0) && (
+        {(authType === 'clientCert' || clientCertData.length > 0 || clientP12.length > 0) && (
           <>
             <Field
-              label="Client-Zertifikat als PKCS#12 (base64)"
+              label="Client-Zertifikat (PEM oder base64)"
+              value={clientCertData}
+              onChangeText={setClientCertData}
+              placeholder="client-certificate-data aus der Kubeconfig"
+              multiline
+            />
+            <Field
+              label="Client-Key (PEM oder base64)"
+              value={clientKeyData}
+              onChangeText={setClientKeyData}
+              placeholder="client-key-data aus der Kubeconfig"
+              multiline
+            />
+            <Text style={styles.hint}>
+              Alternativ kann statt Zertifikat + Key ein PKCS#12-Bundle hinterlegt werden:
+            </Text>
+            <Field
+              label="PKCS#12 (base64, optional)"
               value={clientP12}
               onChangeText={setClientP12}
               placeholder="base64 von: openssl pkcs12 -export -in client.crt -inkey client.key"

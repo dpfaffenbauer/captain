@@ -19,9 +19,9 @@ export class KubeApiError extends Error {
   }
 }
 
-function caPemOf(cluster: ClusterConfig): string | undefined {
-  if (!cluster.caData) return undefined;
-  const trimmed = cluster.caData.trim();
+function pemOf(data: string | undefined): string | undefined {
+  if (!data) return undefined;
+  const trimmed = data.trim();
   // kubeconfig stores the PEM base64-encoded; accept raw PEM pastes too.
   if (trimmed.includes('-----BEGIN')) return trimmed;
   if (looksLikeBase64(trimmed)) return base64Decode(trimmed);
@@ -41,8 +41,10 @@ async function rawRequest(
       method,
       headers,
       body,
-      caPem: caPemOf(cluster),
+      caPem: pemOf(cluster.caData),
       insecure: cluster.insecureSkipTlsVerify === true,
+      clientCertPem: pemOf(cluster.clientCertData),
+      clientKeyPem: pemOf(cluster.clientKeyData),
       pkcs12: cluster.clientP12,
       pkcs12Password: cluster.clientP12Password,
       timeoutMs: 30000,

@@ -15,6 +15,7 @@
     "expo-web-browser": "~56.0.5",
     "js-yaml": "^4.2.0",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "^4.25.2"
@@ -25,10 +26,16 @@
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
+  },
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit"
   },
-  "private": true
+  "private": true,
+  "packageManager": "yarn@4.9.4+sha512.7b1cb0b62abba6a537b3a2ce00811a843bea02bcf53138581a6ae5b1bf563f734872bd47de49ce32a9ca9dcaff995aa789577ffb16811da7c603dcf69e73750b"
 }

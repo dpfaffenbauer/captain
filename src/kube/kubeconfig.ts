@@ -67,9 +67,14 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
   }
 
   if (typeof user['client-certificate-data'] === 'string') {
+    if (typeof user['client-key-data'] !== 'string') {
+      warnings.push('Client-Zertifikat gefunden, aber kein Key (client-key-data); bitte im Formular ergänzen.');
+    }
+    return { type: 'clientCert' };
+  }
+  if (typeof user['client-certificate'] === 'string') {
     warnings.push(
-      'Client-Zertifikat: Bitte als PKCS#12 (.p12, base64) im Cluster-Formular hinterlegen. ' +
-        'Konvertierung: openssl pkcs12 -export -in client.crt -inkey client.key -out client.p12'
+      'Client-Zertifikat liegt als Dateipfad vor; bitte den Inhalt von Zertifikat und Key (PEM) im Formular einfügen.'
     );
     return { type: 'clientCert' };
   }
@@ -108,6 +113,12 @@ export function parseKubeconfig(text: string): ImportedContext[] {
             ? clusterDef['certificate-authority-data']
             : undefined,
         insecureSkipTlsVerify: clusterDef['insecure-skip-tls-verify'] === true,
+        clientCertData:
+          typeof userDef['client-certificate-data'] === 'string'
+            ? userDef['client-certificate-data']
+            : undefined,
+        clientKeyData:
+          typeof userDef['client-key-data'] === 'string' ? userDef['client-key-data'] : undefined,
         auth,
       },
     });

@@ -8,7 +8,11 @@ export interface NativeRequestOptions {
   /** PEM-encoded CA bundle used to validate the server certificate. */
   caPem?: string;
   insecure?: boolean;
-  /** base64-encoded PKCS#12 bundle for client certificate auth. */
+  /** PEM-encoded client certificate (may include intermediates) for client certificate auth. */
+  clientCertPem?: string;
+  /** PEM-encoded private key (PKCS#1, SEC1, or unencrypted PKCS#8) matching clientCertPem. */
+  clientKeyPem?: string;
+  /** base64-encoded PKCS#12 bundle for client certificate auth (alternative to PEM cert/key). */
   pkcs12?: string;
   pkcs12Password?: string;
   timeoutMs?: number;

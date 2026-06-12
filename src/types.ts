@@ -36,7 +36,11 @@ export interface ClusterConfig {
   /** base64-encoded PEM CA bundle (kubeconfig certificate-authority-data format). */
   caData?: string;
   insecureSkipTlsVerify?: boolean;
-  /** base64-encoded PKCS#12 bundle for client certificate auth. */
+  /** Client certificate, PEM or base64 (kubeconfig client-certificate-data format). */
+  clientCertData?: string;
+  /** Private key for the client certificate, PEM or base64 (kubeconfig client-key-data format). */
+  clientKeyData?: string;
+  /** base64-encoded PKCS#12 bundle for client certificate auth (alternative to PEM cert/key). */
   clientP12?: string;
   clientP12Password?: string;
   auth: AuthConfig;
