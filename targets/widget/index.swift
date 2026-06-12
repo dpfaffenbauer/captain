@@ -1,3 +1,4 @@
+import ActivityKit
 import SwiftUI
 import WidgetKit
 
@@ -187,9 +188,83 @@ struct ClusterHealthWidget: Widget {
   }
 }
 
+// MARK: - Port forward Live Activity
+
+/// Mirror of the type in modules/captain-widget — ActivityKit matches the
+/// app's activity to this UI by type name + shape.
+struct PortForwardAttributes: ActivityAttributes {
+  public struct ContentState: Codable, Hashable {
+    var status: String
+  }
+
+  var pod: String
+  var localPort: Int
+  var remotePort: Int
+}
+
+struct PortForwardActivityView: View {
+  let context: ActivityViewContext<PortForwardAttributes>
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Text("⇄")
+        .font(.system(size: 18, weight: .bold))
+        .foregroundColor(Color(red: 0.36, green: 0.49, blue: 1.0))
+      VStack(alignment: .leading, spacing: 2) {
+        Text(context.attributes.pod)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundColor(.white)
+          .lineLimit(1)
+        Text("localhost:\(context.attributes.localPort) → :\(context.attributes.remotePort)")
+          .font(.system(size: 11, design: .monospaced))
+          .foregroundColor(.white.opacity(0.55))
+      }
+      Spacer()
+      Circle()
+        .fill(context.state.status == "active" ? Color(red: 0.20, green: 0.83, blue: 0.60) : Color.white.opacity(0.35))
+        .frame(width: 9, height: 9)
+    }
+    .padding(14)
+    .activityBackgroundTint(Color(red: 0.06, green: 0.08, blue: 0.13))
+  }
+}
+
+struct PortForwardLiveActivity: Widget {
+  var body: some WidgetConfiguration {
+    ActivityConfiguration(for: PortForwardAttributes.self) { context in
+      PortForwardActivityView(context: context)
+    } dynamicIsland: { context in
+      DynamicIsland {
+        DynamicIslandExpandedRegion(.leading) {
+          Text("⇄ \(context.attributes.pod)")
+            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+        }
+        DynamicIslandExpandedRegion(.trailing) {
+          Text(":\(context.attributes.localPort)")
+            .font(.system(size: 13, design: .monospaced))
+        }
+        DynamicIslandExpandedRegion(.bottom) {
+          Text("localhost:\(context.attributes.localPort) → \(context.attributes.pod):\(context.attributes.remotePort)")
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundColor(.secondary)
+        }
+      } compactLeading: {
+        Text("⇄")
+      } compactTrailing: {
+        Text(":\(context.attributes.localPort)")
+          .font(.system(size: 12, design: .monospaced))
+      } minimal: {
+        Text("⇄")
+      }
+    }
+  }
+}
+
 @main
 struct CaptainWidgets: WidgetBundle {
   var body: some Widget {
     ClusterHealthWidget()
+    PortForwardLiveActivity()
   }
 }
