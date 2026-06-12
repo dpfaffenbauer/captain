@@ -80,6 +80,25 @@ export interface ClusterConfig {
   prometheus?: PrometheusConfig;
 }
 
+/**
+ * A pinned resource the user wants quick access to. Stores everything needed to
+ * both render a row and navigate straight to the item screen, so favorites work
+ * across clusters without a fresh discovery round-trip.
+ */
+export interface FavoriteResource {
+  clusterId: string;
+  group: string;
+  version: string;
+  plural: string;
+  kind: string;
+  namespaced: boolean;
+  verbs: string[];
+  name: string;
+  namespace?: string;
+  /** Unix epoch milliseconds when it was pinned (newest first in the list). */
+  addedAt: number;
+}
+
 /** A resource type discovered from the API server. */
 export interface ApiResourceType {
   /** API group; empty string for the core group. */

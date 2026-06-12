@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { syncBackgroundAlerts } from '../src/background/alerts';
 import { ClustersProvider } from '../src/state/ClustersContext';
+import { FavoritesProvider } from '../src/state/FavoritesContext';
 import { colors } from '../src/ui/theme';
 import { authenticate, loadAppLockSetting } from '../src/util/applock';
 import { loadHapticsSetting } from '../src/util/haptics';
@@ -76,6 +77,7 @@ export default function RootLayout() {
   }, []);
   return (
     <ClustersProvider>
+      <FavoritesProvider>
       <StatusBar style="light" />
       <AppLockGate>
         <Stack
@@ -95,6 +97,7 @@ export default function RootLayout() {
           <Stack.Screen name="cluster/[id]" options={{ headerShown: false }} />
         </Stack>
       </AppLockGate>
+      </FavoritesProvider>
     </ClustersProvider>
   );
 }

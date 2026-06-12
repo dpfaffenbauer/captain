@@ -44,6 +44,8 @@ import { KubeApiError } from '../../../src/kube/transport';
 import { DiffLine, diffLines } from '../../../src/util/diff';
 import { summarizeResource, SummarySection } from '../../../src/kube/summarize';
 import { useClusters } from '../../../src/state/ClustersContext';
+import { useFavorites } from '../../../src/state/FavoritesContext';
+import { favoriteKey } from '../../../src/storage/favorites';
 import { hapticTap, hapticWarning } from '../../../src/util/haptics';
 import { ApiResourceType } from '../../../src/types';
 import { BackButton, Card, SquircleIcon, StatusDot } from '../../../src/ui/kit';
@@ -130,6 +132,7 @@ export default function ResourceItemScreen() {
   const router = useRouter();
   const { getById } = useClusters();
   const cluster = getById(params.id);
+  const { isFavorite, toggle: toggleFavorite } = useFavorites();
 
   const type = useMemo<ApiResourceType>(
     () => ({
@@ -146,6 +149,24 @@ export default function ResourceItemScreen() {
   const typeKey = `${type.group}/${type.kind}`;
   const isPod = typeKey === '/Pod';
   const isNode = typeKey === '/Node';
+
+  const pinned = isFavorite(
+    favoriteKey({ clusterId: params.id, group: type.group, kind: type.kind, namespace, name: params.name })
+  );
+  const handleToggleFavorite = () => {
+    hapticTap();
+    toggleFavorite({
+      clusterId: params.id,
+      group: type.group,
+      version: type.version,
+      plural: type.plural,
+      kind: type.kind,
+      namespaced: type.namespaced,
+      verbs: type.verbs,
+      name: params.name,
+      namespace,
+    });
+  };
 
   const [manifest, setManifest] = useState<Record<string, unknown> | null>(null);
   const [events, setEvents] = useState<ResourceEvent[]>([]);
@@ -625,6 +646,16 @@ export default function ResourceItemScreen() {
             </Text>
           </View>
         ) : null}
+        <TouchableOpacity
+          style={styles.starButton}
+          onPress={handleToggleFavorite}
+          accessibilityLabel={pinned ? 'Unpin' : 'Pin'}
+          hitSlop={8}
+        >
+          <Text style={[styles.starGlyph, pinned && styles.starGlyphActive]}>
+            {pinned ? '★' : '☆'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -901,6 +932,9 @@ const styles = StyleSheet.create({
   headerSub: { color: 'rgba(242,245,250,0.4)', fontSize: 11.5 },
   statusPill: { borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 5 },
   statusPillText: { fontSize: 11, fontWeight: '700' },
+  starButton: { paddingHorizontal: 4, paddingVertical: 2 },
+  starGlyph: { color: colors.textDim, fontSize: 22, fontWeight: '600' },
+  starGlyphActive: { color: colors.warning },
   errorWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingTop: 8, paddingBottom: 60, gap: 12 },
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

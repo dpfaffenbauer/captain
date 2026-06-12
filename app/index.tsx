@@ -10,10 +10,13 @@ import {
   View,
 } from 'react-native';
 import { publishWidgetSnapshot, WidgetClusterEntry } from '../modules/captain-widget';
+import { abbreviationFor } from '../src/kube/categories';
 import { ClusterHealth, getClusterHealth, healthTone } from '../src/kube/health';
 import { useClusters } from '../src/state/ClustersContext';
-import { ClusterConfig } from '../src/types';
-import { Card, StatusDot } from '../src/ui/kit';
+import { useFavorites } from '../src/state/FavoritesContext';
+import { favoriteKey } from '../src/storage/favorites';
+import { ClusterConfig, FavoriteResource } from '../src/types';
+import { Card, SquircleIcon, StatusDot } from '../src/ui/kit';
 import { Loading } from '../src/ui/components';
 import { colors, radius, spacing } from '../src/ui/theme';
 
@@ -82,7 +85,8 @@ function ConnectOption({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { clusters, loading, remove } = useClusters();
+  const { clusters, loading, remove, getById } = useClusters();
+  const { favorites, remove: removeFavorite } = useFavorites();
   const [health, setHealth] = useState<Record<string, ClusterHealth | null>>({});
   // iPad: keep the hero/cluster cards at a phone-ish width, centered.
   const { width } = useWindowDimensions();
@@ -129,6 +133,33 @@ export default function HomeScreen() {
     ]);
   };
 
+  // Only show pins whose cluster still exists; tapping jumps straight to the item.
+  const pinned = favorites.filter((fav) => getById(fav.clusterId));
+
+  const openFavorite = (fav: FavoriteResource) => {
+    router.push({
+      pathname: '/cluster/[id]/item',
+      params: {
+        id: fav.clusterId,
+        group: fav.group,
+        version: fav.version,
+        plural: fav.plural,
+        kind: fav.kind,
+        namespaced: fav.namespaced ? '1' : '0',
+        verbs: fav.verbs.join(','),
+        name: fav.name,
+        namespace: fav.namespace ?? '',
+      },
+    });
+  };
+
+  const confirmUnpin = (fav: FavoriteResource) => {
+    Alert.alert('Unpin', `Remove "${fav.name}" from pinned?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Unpin', style: 'destructive', onPress: () => removeFavorite(favoriteKey(fav)) },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -147,6 +178,39 @@ export default function HomeScreen() {
             </Text>
           ) : null}
         </View>
+
+        {/* Pinned resources (across all clusters) */}
+        {pinned.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Pinned</Text>
+            {pinned.map((fav) => {
+              const cluster = getById(fav.clusterId);
+              const sub = [fav.kind, cluster?.name, fav.namespace].filter(Boolean).join(' · ');
+              return (
+                <TouchableOpacity
+                  key={favoriteKey(fav)}
+                  onPress={() => openFavorite(fav)}
+                  onLongPress={() => confirmUnpin(fav)}
+                >
+                  <Card style={styles.pinnedRow}>
+                    <SquircleIcon abbr={abbreviationFor(fav)} color={colors.accent} size={32} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.clusterName} numberOfLines={1}>
+                        {fav.name}
+                      </Text>
+                      <Text style={styles.clusterSub} numberOfLines={1}>
+                        {sub}
+                      </Text>
+                    </View>
+                    <Text style={styles.starGlyph}>★</Text>
+                    <Text style={styles.chevron}>›</Text>
+                  </Card>
+                </TouchableOpacity>
+              );
+            })}
+            <Text style={styles.hint}>Long-press a pin to remove it.</Text>
+          </View>
+        ) : null}
 
         {/* Stored clusters */}
         {clusters.length > 0 ? (
@@ -266,6 +330,14 @@ const styles = StyleSheet.create({
   },
   clusterName: { color: colors.text, fontSize: 15.5, fontWeight: '600' },
   clusterSub: { color: colors.textDim, fontSize: 12 },
+  pinnedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: radius.card + 2,
+    padding: 15,
+  },
+  starGlyph: { color: colors.warning, fontSize: 14 },
   clusterHealth: { color: colors.textDim, fontSize: 11.5, fontWeight: '600' },
   option: {
     flexDirection: 'row',
