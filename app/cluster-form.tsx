@@ -22,17 +22,18 @@ import { invalidateToken } from '../src/auth/tokens';
 import { getServerVersion } from '../src/kube/client';
 import { useClusters } from '../src/state/ClustersContext';
 import { AuthType, ClusterConfig } from '../src/types';
+import { ProviderTile, SignInButton } from '../src/ui/brand';
 import { Button, ErrorBox, Field } from '../src/ui/components';
 import { colors, spacing } from '../src/ui/theme';
 import { newId } from '../src/util/format';
 
-const AUTH_TYPES: Array<{ type: AuthType; label: string }> = [
-  { type: 'token', label: 'Token' },
-  { type: 'eks', label: 'AWS EKS' },
-  { type: 'gke', label: 'Google GKE' },
-  { type: 'aks', label: 'Azure AKS' },
-  { type: 'oidc', label: 'OIDC' },
-  { type: 'clientCert', label: 'Zertifikat' },
+const AUTH_TYPES: Array<{ type: AuthType; label: string; subtitle: string }> = [
+  { type: 'gke', label: 'Google GKE', subtitle: 'Mit Google anmelden' },
+  { type: 'aks', label: 'Azure AKS', subtitle: 'Mit Microsoft anmelden' },
+  { type: 'eks', label: 'AWS EKS', subtitle: 'IAM-Anmeldedaten' },
+  { type: 'oidc', label: 'OIDC / SSO', subtitle: 'Keycloak · Dex · Authentik' },
+  { type: 'token', label: 'Token', subtitle: 'Bearer · ServiceAccount' },
+  { type: 'clientCert', label: 'Zertifikat', subtitle: 'mTLS · PKCS#12' },
 ];
 
 export default function ClusterFormScreen() {
@@ -261,24 +262,21 @@ export default function ClusterFormScreen() {
           <Text style={styles.toggleLabel}>TLS-Verifizierung überspringen (unsicher)</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Authentifizierung</Text>
-        <View style={styles.segmented}>
+        <Text style={styles.sectionTitle}>Anmelden mit</Text>
+        <View style={styles.providerGrid}>
           {AUTH_TYPES.map((option) => (
-            <TouchableOpacity
+            <ProviderTile
               key={option.type}
-              style={[styles.segment, authType === option.type && styles.segmentActive]}
+              provider={option.type}
+              title={option.label}
+              subtitle={option.subtitle}
+              active={authType === option.type}
               onPress={() => {
                 setAuthType(option.type);
                 setOauthTokens(undefined);
                 setError('');
               }}
-            >
-              <Text
-                style={[styles.segmentText, authType === option.type && styles.segmentTextActive]}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </View>
 
@@ -320,12 +318,13 @@ export default function ClusterFormScreen() {
               onChangeText={setGkeClientId}
               placeholder="1234-abc.apps.googleusercontent.com"
             />
-            <Button
-              title={oauthTokens ? 'Mit Google verbunden – erneut anmelden' : 'Mit Google anmelden'}
-              variant={oauthTokens ? 'secondary' : 'primary'}
+            <SignInButton
+              provider="gke"
+              title={oauthTokens ? 'Mit Google verbunden ✓' : 'Mit Google anmelden'}
               onPress={() => void handleOAuthSignIn()}
               disabled={!gkeClientId.trim()}
               busy={busy}
+              connected={!!oauthTokens}
             />
           </>
         )}
@@ -340,12 +339,13 @@ export default function ClusterFormScreen() {
               placeholder="00000000-0000-…"
             />
             <Text style={styles.hint}>Redirect-URI für die App-Registrierung: {azureRedirect}</Text>
-            <Button
-              title={oauthTokens ? 'Mit Microsoft verbunden – erneut anmelden' : 'Mit Microsoft anmelden'}
-              variant={oauthTokens ? 'secondary' : 'primary'}
+            <SignInButton
+              provider="aks"
+              title={oauthTokens ? 'Mit Microsoft verbunden ✓' : 'Mit Microsoft anmelden'}
               onPress={() => void handleOAuthSignIn()}
               disabled={!aksTenantId.trim() || !aksClientId.trim()}
               busy={busy}
+              connected={!!oauthTokens}
             />
           </>
         )}
@@ -378,12 +378,13 @@ export default function ClusterFormScreen() {
               placeholder="groups"
             />
             <Text style={styles.hint}>Redirect-URI für den OIDC-Client: {oidcRedirect}</Text>
-            <Button
-              title={oauthTokens ? 'Angemeldet – erneut anmelden' : 'Beim Provider anmelden'}
-              variant={oauthTokens ? 'secondary' : 'primary'}
+            <SignInButton
+              provider="oidc"
+              title={oauthTokens ? 'Angemeldet ✓ – erneut anmelden' : 'Mit SSO anmelden'}
               onPress={() => void handleOAuthSignIn()}
               disabled={!oidcIssuer.trim() || !oidcClientId.trim()}
               busy={busy}
+              connected={!!oauthTokens}
             />
             <Text style={styles.hint}>
               Der API-Server muss mit passenden --oidc-issuer-url/--oidc-client-id-Flags
@@ -446,26 +447,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  segmented: {
+  providerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  segment: {
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    backgroundColor: colors.surface,
-  },
-  segmentActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  segmentText: { color: colors.textDim, fontSize: 13 },
-  segmentTextActive: { color: colors.accentText, fontWeight: '600' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   checkbox: {
     width: 20,
