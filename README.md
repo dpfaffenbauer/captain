@@ -109,7 +109,9 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
   Cluster-Verbindung (CA-Trust, Token, mTLS) reicht. Im Dashboard erscheinen
   CPU-/Memory-Verläufe der letzten Stunde als Sparklines sowie die aktuell
   **feuernden Alerts** (nach Schweregrad sortiert, Pod-Alerts öffnen direkt die
-  Ressource). Ohne erreichbares Prometheus blendet sich alles automatisch aus.
+  Ressource). „View all" öffnet eine eigene Alerts-Seite mit Severity-Filter;
+  ein Tap auf einen Alert zeigt Beschreibung, Laufzeit, Wert, alle Labels und
+  einen Runbook-Link. Ohne erreichbares Prometheus blendet sich alles aus.
 - **QR-Onboarding**: Kubeconfig als QR-Code scannen
   (`kubectl config view --minify --raw | qrencode -t png`).
 - **Settings-Sheet**: Default-Namespace, Haptics-Toggle (echtes Tap-Feedback
