@@ -57,6 +57,21 @@ Events) und Bottom-Sheets für Cluster- und Namespace-Wahl.
   Die App schreibt bei jedem Health-Check einen Snapshot in die App Group
   (`group.at.pfaffenbauer.captain`) und stößt den Widget-Reload an; das
   Widget zeigt also den Stand des letzten App-Starts.
+- **Hintergrund-Alerts** (optional): ein BGTaskScheduler-Task prüft die
+  Cluster periodisch im Hintergrund, aktualisiert das Widget und meldet
+  Verschlechterungen per lokaler Notification (dedupliziert; iOS plant die
+  Läufe opportunistisch — Best Effort, kein Monitoring-Ersatz).
+- **Interaktives Terminal**: neben One-Shot-Kommandos gibt es einen
+  Interactive-Modus — eine persistente `kubectl exec -it`-Session (PTY,
+  stdin über den offenen WebSocket, ANSI-Sequenzen werden gefiltert).
+- **Live Activity** (iOS 16.2+): aktive Port-Forwards erscheinen als
+  Live-Aktivität auf dem Sperrbildschirm und in der Dynamic Island.
+- **Siri / Shortcuts** (App Intents): „Check cluster health" beantwortet
+  Siri headless aus dem letzten Health-Snapshot; „Open Cluster" (iOS 18+)
+  öffnet einen Cluster per Deep Link (`captain://open?cluster=<name>`).
+- **iPad-Split-View**: ab 768 pt Breite zeigt die Ressourcen-Liste links die
+  Liste und rechts einen Inspector (Summary, Events, YAML) für das gewählte
+  Objekt; Browse- und Home-Inhalte werden zentriert begrenzt.
 - **Face-ID-App-Lock** (optional): verbirgt die App-Inhalte bei Kaltstart und
   Rückkehr aus dem Hintergrund, bis Face ID/Touch ID bzw. der Geräte-Code
   bestätigt wurde.
@@ -235,7 +250,8 @@ base64 -i client.p12 | pbcopy
   iOS); der Import mappt sie auf die nativen Auth-Methoden (`aws`,
   `gke-gcloud-auth-plugin`, `kubelogin`, `oidc-login` → OIDC) und markiert
   fehlende Felder.
-- Exec führt One-Shot-Kommandos aus (`/bin/sh -c …`), kein interaktives TTY.
+- Das interaktive Terminal ist ein einfaches PTY ohne vollwertige
+  ANSI-Emulation (kein vim/top); Escape-Sequenzen werden entfernt.
 - Helm- und GitOps-Ansichten sind lesend (plus Sync-Trigger); Upgrade/
   Rollback/Uninstall von Releases bleibt dem CLI überlassen.
 - In Expo Go (ohne natives Modul) gibt es kein Log-Streaming und keine

@@ -88,6 +88,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="open" options={{ headerShown: false }} />
           <Stack.Screen name="cluster-form" options={{ title: 'Cluster' }} />
           <Stack.Screen name="kubeconfig-import" options={{ title: 'Kubeconfig importieren' }} />
           <Stack.Screen name="qr-scan" options={{ title: 'QR-Code scannen' }} />
