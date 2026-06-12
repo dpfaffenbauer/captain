@@ -150,6 +150,152 @@ export async function scaleResource(
   );
 }
 
+/** Pauses or resumes a Deployment rollout like `kubectl rollout pause/resume`. */
+export async function setRolloutPaused(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  paused: boolean,
+  namespace?: string
+): Promise<void> {
+  await kubeRequest(cluster, `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ spec: { paused: paused ? true : null } }),
+    contentType: 'application/merge-patch+json',
+  });
+}
+
+/** Updates a single container image like `kubectl set image`. */
+export async function setContainerImage(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  container: string,
+  image: string,
+  namespace?: string
+): Promise<void> {
+  const patch = {
+    spec: { template: { spec: { containers: [{ name: container, image }] } } },
+  };
+  await kubeRequest(cluster, `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+    contentType: 'application/strategic-merge-patch+json',
+  });
+}
+
+export interface DeploymentRevision {
+  revision: number;
+  replicaSet: string;
+  images: string[];
+  changeCause?: string;
+  current: boolean;
+  template: Record<string, any>;
+}
+
+const REVISION_ANNOTATION = 'deployment.kubernetes.io/revision';
+
+/** Rollout history of a Deployment, newest first (kubectl rollout history). */
+export async function listDeploymentRevisions(
+  cluster: ClusterConfig,
+  namespace: string,
+  name: string
+): Promise<DeploymentRevision[]> {
+  const prefix = `/apis/apps/v1/namespaces/${encodeURIComponent(namespace)}`;
+  const deployment = await kubeRequestJson<any>(
+    cluster,
+    `${prefix}/deployments/${encodeURIComponent(name)}`
+  );
+  const matchLabels: Record<string, string> = deployment.spec?.selector?.matchLabels ?? {};
+  const selector = Object.entries(matchLabels)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(',');
+  const list = await kubeRequestJson<{ items?: any[] }>(
+    cluster,
+    `${prefix}/replicasets?labelSelector=${encodeURIComponent(selector)}&limit=500`
+  );
+  const uid = deployment.metadata?.uid;
+  const currentRevision = Number(deployment.metadata?.annotations?.[REVISION_ANNOTATION] ?? NaN);
+  const revisions = (list.items ?? [])
+    .filter((rs) => (rs.metadata?.ownerReferences ?? []).some((ref: any) => ref.uid === uid))
+    .map((rs): DeploymentRevision => {
+      const revision = Number(rs.metadata?.annotations?.[REVISION_ANNOTATION] ?? 0);
+      return {
+        revision,
+        replicaSet: rs.metadata?.name ?? '',
+        images: (rs.spec?.template?.spec?.containers ?? []).map((c: any) => String(c.image ?? '')),
+        changeCause: rs.metadata?.annotations?.['kubernetes.io/change-cause'],
+        current: revision === currentRevision,
+        template: rs.spec?.template ?? {},
+      };
+    });
+  revisions.sort((a, b) => b.revision - a.revision);
+  return revisions;
+}
+
+/** Rolls a Deployment back to the given revision like `kubectl rollout undo`. */
+export async function rollbackDeployment(
+  cluster: ClusterConfig,
+  namespace: string,
+  name: string,
+  revision: DeploymentRevision
+): Promise<void> {
+  const template = JSON.parse(JSON.stringify(revision.template));
+  // kubectl strips the RS-managed hash label before re-applying the template.
+  delete template?.metadata?.labels?.['pod-template-hash'];
+  const patch = [{ op: 'replace', path: '/spec/template', value: template }];
+  await kubeRequest(
+    cluster,
+    `/apis/apps/v1/namespaces/${encodeURIComponent(namespace)}/deployments/${encodeURIComponent(name)}`,
+    { method: 'PATCH', body: JSON.stringify(patch), contentType: 'application/json-patch+json' }
+  );
+}
+
+/** Suspends or resumes a CronJob's schedule. */
+export async function setCronJobSuspended(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  suspend: boolean,
+  namespace?: string
+): Promise<void> {
+  await kubeRequest(cluster, `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ spec: { suspend } }),
+    contentType: 'application/merge-patch+json',
+  });
+}
+
+/** Creates a one-off Job from a CronJob like `kubectl create job --from=cronjob/<name>`. */
+export async function triggerCronJob(
+  cluster: ClusterConfig,
+  type: ApiResourceType,
+  name: string,
+  namespace: string
+): Promise<string> {
+  const cron = await kubeRequestJson<any>(
+    cluster,
+    `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}`
+  );
+  const jobName = `${name.slice(0, 40)}-manual-${Date.now().toString(36)}`;
+  const job = {
+    apiVersion: 'batch/v1',
+    kind: 'Job',
+    metadata: {
+      name: jobName,
+      namespace,
+      annotations: { 'cronjob.kubernetes.io/instantiate': 'manual' },
+      labels: cron.spec?.jobTemplate?.metadata?.labels,
+    },
+    spec: cron.spec?.jobTemplate?.spec,
+  };
+  await kubeRequest(cluster, `/apis/batch/v1/namespaces/${encodeURIComponent(namespace)}/jobs`, {
+    method: 'POST',
+    body: JSON.stringify(job),
+  });
+  return jobName;
+}
+
 /** Triggers a rolling restart like `kubectl rollout restart`. */
 export async function restartRollout(
   cluster: ClusterConfig,
