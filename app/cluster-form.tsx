@@ -13,6 +13,7 @@ import {
 import {
   azureRedirectUri,
   azureSignIn,
+  DEFAULT_GKE_CLIENT_ID,
   googleSignIn,
   OAuthTokens,
   oidcRedirectUri,
@@ -60,7 +61,7 @@ export default function ClusterFormScreen() {
   const [eksSecretAccessKey, setEksSecretAccessKey] = useState(eksAuth?.secretAccessKey ?? '');
   const [eksSessionToken, setEksSessionToken] = useState(eksAuth?.sessionToken ?? '');
   const gkeAuth = existing?.auth.type === 'gke' ? existing.auth : undefined;
-  const [gkeClientId, setGkeClientId] = useState(gkeAuth?.clientId ?? '');
+  const [gkeClientId, setGkeClientId] = useState(gkeAuth?.clientId || DEFAULT_GKE_CLIENT_ID);
   const aksAuth = existing?.auth.type === 'aks' ? existing.auth : undefined;
   const [aksTenantId, setAksTenantId] = useState(aksAuth?.tenantId ?? '');
   const [aksClientId, setAksClientId] = useState(aksAuth?.clientId ?? '');
@@ -312,12 +313,14 @@ export default function ClusterFormScreen() {
 
         {authType === 'gke' && (
           <>
-            <Field
-              label="OAuth-Client-ID (iOS-Client aus der Google Cloud Console)"
-              value={gkeClientId}
-              onChangeText={setGkeClientId}
-              placeholder="1234-abc.apps.googleusercontent.com"
-            />
+            {!DEFAULT_GKE_CLIENT_ID && (
+              <Field
+                label="OAuth-Client-ID (iOS-Client aus der Google Cloud Console)"
+                value={gkeClientId}
+                onChangeText={setGkeClientId}
+                placeholder="1234-abc.apps.googleusercontent.com"
+              />
+            )}
             <SignInButton
               provider="gke"
               title={oauthTokens ? 'Mit Google verbunden ✓' : 'Mit Google anmelden'}

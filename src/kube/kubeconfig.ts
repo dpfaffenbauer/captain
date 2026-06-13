@@ -1,6 +1,11 @@
 import yaml from 'js-yaml';
+import { DEFAULT_GKE_CLIENT_ID } from '../auth/oauth';
 import { AuthConfig, ClusterConfig } from '../types';
 import { newId } from '../util/format';
+
+const GKE_IMPORT_WARNING = DEFAULT_GKE_CLIENT_ID
+  ? 'GKE: Bitte mit Google anmelden.'
+  : 'GKE: Bitte OAuth-Client-ID eintragen und mit Google anmelden.';
 
 export interface ImportedContext {
   contextName: string;
@@ -45,8 +50,8 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
       };
     }
     if (command.includes('gke') || command.includes('gcloud')) {
-      warnings.push('GKE: Bitte OAuth-Client-ID eintragen und mit Google anmelden.');
-      return { type: 'gke', clientId: '' };
+      warnings.push(GKE_IMPORT_WARNING);
+      return { type: 'gke', clientId: DEFAULT_GKE_CLIENT_ID };
     }
     // int128/kubelogin (oidc-login) carries the issuer in its args.
     if (args.some((arg) => arg.startsWith('--oidc-issuer-url'))) {
@@ -68,8 +73,8 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
 
   const authProvider = user['auth-provider'] as { name?: string; config?: Record<string, string> } | undefined;
   if (authProvider?.name === 'gcp') {
-    warnings.push('GKE: Bitte OAuth-Client-ID eintragen und mit Google anmelden.');
-    return { type: 'gke', clientId: '' };
+    warnings.push(GKE_IMPORT_WARNING);
+    return { type: 'gke', clientId: DEFAULT_GKE_CLIENT_ID };
   }
   if (authProvider?.name === 'azure') {
     warnings.push('AKS: Bitte Tenant-ID und Client-ID eintragen und mit Microsoft anmelden.');
