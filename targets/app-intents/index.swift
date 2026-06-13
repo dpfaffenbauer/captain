@@ -5,6 +5,13 @@ import Foundation
 // app-group snapshot the app (and the background task) keep fresh; the open
 // intent deep-links into a stored cluster.
 
+// Entry point for the App Intents extension target. Without an `@main`
+// AppIntentsExtension the .appex ships with no `__swift5_entry` section and
+// App Store Connect rejects the upload ("Invalid Mach-O header ... prevents
+// the extension from running").
+@main
+struct CaptainIntentsExtension: AppIntentsExtension {}
+
 let appGroup = "group.at.pfaffenbauer.captain"
 let snapshotKey = "captain.widget.snapshot"
 
