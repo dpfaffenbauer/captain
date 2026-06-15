@@ -65,14 +65,14 @@ export default function KubeconfigImportScreen() {
       >
         {error ? <ErrorBox message={error} /> : null}
         <Field
-          label="Kubeconfig (YAML einfügen)"
+          label="Kubeconfig (paste YAML)"
           value={text}
           onChangeText={setText}
           placeholder="apiVersion: v1&#10;kind: Config&#10;clusters: …"
           multiline
           style={styles.editor}
         />
-        <Button title="Kontexte lesen" variant="secondary" onPress={handleParse} disabled={!text.trim()} />
+        <Button title="Read contexts" variant="secondary" onPress={handleParse} disabled={!text.trim()} />
 
         {contexts.map((entry) => (
           <TouchableOpacity
@@ -100,7 +100,7 @@ export default function KubeconfigImportScreen() {
         {contexts.length > 0 && (
           <View style={styles.actions}>
             <Button
-              title={`${selected.size} Cluster importieren`}
+              title={`Import ${selected.size} clusters`}
               onPress={() => void handleImport()}
               disabled={selected.size === 0}
             />

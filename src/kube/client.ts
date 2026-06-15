@@ -558,5 +558,5 @@ export async function listNamespaces(cluster: ClusterConfig): Promise<string[]> 
 
 export async function getServerVersion(cluster: ClusterConfig): Promise<string> {
   const body = await kubeRequestJson<{ gitVersion?: string }>(cluster, '/version');
-  return body.gitVersion ?? 'unbekannt';
+  return body.gitVersion ?? 'unknown';
 }

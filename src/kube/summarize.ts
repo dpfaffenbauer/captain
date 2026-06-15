@@ -38,10 +38,10 @@ function joinMap(map?: Record<string, string>, max = 8): string | undefined {
 
 function metadataSection(manifest: Manifest): SummarySection | undefined {
   const metadata = manifest.metadata ?? {};
-  return section('Metadaten', [
+  return section('Metadata', [
     row('Namespace', metadata.namespace),
-    row('Alter', ageOf(metadata.creationTimestamp)),
-    row('Erstellt', metadata.creationTimestamp),
+    row('Age', ageOf(metadata.creationTimestamp)),
+    row('Created', metadata.creationTimestamp),
     row('Labels', joinMap(metadata.labels), { mono: true }),
     row('Annotations', metadata.annotations ? `${Object.keys(metadata.annotations).length}` : undefined),
   ]);
@@ -96,14 +96,14 @@ function podSummary(manifest: Manifest): Array<SummarySection | undefined> {
     section('Status', [
       row('Phase', phase, { status: phaseStatus }),
       row('Node', spec.nodeName, { mono: true }),
-      row('Pod-IP', status.podIP, { mono: true }),
-      row('Host-IP', status.hostIP, { mono: true }),
-      row('QoS-Klasse', status.qosClass),
+      row('Pod IP', status.podIP, { mono: true }),
+      row('Host IP', status.hostIP, { mono: true }),
+      row('QoS class', status.qosClass),
       row('ServiceAccount', spec.serviceAccountName),
-      row('Gestartet', status.startTime ? ageOf(status.startTime) : undefined),
+      row('Started', status.startTime ? ageOf(status.startTime) : undefined),
     ]),
     section('Container', containerRows(spec.containers, status.containerStatuses)),
-    section('Init-Container', containerRows(spec.initContainers, status.initContainerStatuses)),
+    section('Init containers', containerRows(spec.initContainers, status.initContainerStatuses)),
     conditionsSection(manifest),
   ];
 }
@@ -114,19 +114,19 @@ function deploymentSummary(manifest: Manifest): Array<SummarySection | undefined
   const desired = spec.replicas ?? 0;
   return [
     section('Replicas', [
-      row('Pausiert', spec.paused === true ? 'ja' : undefined, { status: 'warn' }),
+      row('Paused', spec.paused === true ? 'yes' : undefined, { status: 'warn' }),
       row('Revision', manifest.metadata?.annotations?.['deployment.kubernetes.io/revision']),
-      row('Gewünscht', desired),
-      row('Bereit', `${status.readyReplicas ?? 0} / ${desired}`, {
+      row('Desired', desired),
+      row('Ready', `${status.readyReplicas ?? 0} / ${desired}`, {
         status: replicaStatus(status.readyReplicas ?? 0, desired),
       }),
-      row('Aktuell', status.replicas),
-      row('Aktualisiert', status.updatedReplicas),
-      row('Verfügbar', status.availableReplicas),
-      row('Nicht verfügbar', status.unavailableReplicas, { status: 'warn' }),
+      row('Current', status.replicas),
+      row('Updated', status.updatedReplicas),
+      row('Available', status.availableReplicas),
+      row('Unavailable', status.unavailableReplicas, { status: 'warn' }),
     ]),
-    section('Strategie', [
-      row('Typ', spec.strategy?.type),
+    section('Strategy', [
+      row('Type', spec.strategy?.type),
       row('maxSurge', spec.strategy?.rollingUpdate?.maxSurge),
       row('maxUnavailable', spec.strategy?.rollingUpdate?.maxUnavailable),
       row('Selector', joinMap(spec.selector?.matchLabels), { mono: true }),
@@ -144,10 +144,10 @@ function workloadSetSummary(manifest: Manifest, kind: string): Array<SummarySect
   const ready = kind === 'DaemonSet' ? status.numberReady ?? 0 : status.readyReplicas ?? 0;
   return [
     section('Replicas', [
-      row('Gewünscht', desired),
-      row('Bereit', `${ready} / ${desired}`, { status: replicaStatus(ready, desired) }),
-      kind === 'StatefulSet' ? row('Aktualisiert', status.updatedReplicas) : undefined,
-      kind === 'DaemonSet' ? row('Verfügbar', status.numberAvailable) : undefined,
+      row('Desired', desired),
+      row('Ready', `${ready} / ${desired}`, { status: replicaStatus(ready, desired) }),
+      kind === 'StatefulSet' ? row('Updated', status.updatedReplicas) : undefined,
+      kind === 'DaemonSet' ? row('Available', status.numberAvailable) : undefined,
       row('Selector', joinMap(spec.selector?.matchLabels), { mono: true }),
       kind === 'StatefulSet' ? row('Service', spec.serviceName, { mono: true }) : undefined,
     ]),
@@ -163,14 +163,14 @@ function jobSummary(manifest: Manifest): Array<SummarySection | undefined> {
   const completions = spec.completions ?? 1;
   return [
     section('Status', [
-      row('Abgeschlossen', `${succeeded} / ${completions}`, {
+      row('Completed', `${succeeded} / ${completions}`, {
         status: succeeded >= completions ? 'ok' : 'warn',
       }),
-      row('Aktiv', status.active, { status: 'warn' }),
-      row('Fehlgeschlagen', status.failed, { status: 'bad' }),
-      row('Parallelität', spec.parallelism),
-      row('Gestartet', status.startTime ? ageOf(status.startTime) : undefined),
-      row('Beendet', status.completionTime ? ageOf(status.completionTime) : undefined),
+      row('Active', status.active, { status: 'warn' }),
+      row('Failed', status.failed, { status: 'bad' }),
+      row('Parallelism', spec.parallelism),
+      row('Started', status.startTime ? ageOf(status.startTime) : undefined),
+      row('Finished', status.completionTime ? ageOf(status.completionTime) : undefined),
     ]),
     section('Container', containerRows(spec.template?.spec?.containers)),
     conditionsSection(manifest),
@@ -181,13 +181,13 @@ function cronJobSummary(manifest: Manifest): Array<SummarySection | undefined> {
   const spec = manifest.spec ?? {};
   const status = manifest.status ?? {};
   return [
-    section('Zeitplan', [
+    section('Schedule', [
       row('Schedule', spec.schedule, { mono: true }),
-      row('Angehalten', spec.suspend === true ? 'ja' : undefined, { status: 'warn' }),
+      row('Suspended', spec.suspend === true ? 'yes' : undefined, { status: 'warn' }),
       row('Concurrency', spec.concurrencyPolicy),
-      row('Letzter Lauf', status.lastScheduleTime ? ageOf(status.lastScheduleTime) : undefined),
-      row('Letzter Erfolg', status.lastSuccessfulTime ? ageOf(status.lastSuccessfulTime) : undefined),
-      row('Aktive Jobs', Array.isArray(status.active) ? status.active.length : undefined),
+      row('Last run', status.lastScheduleTime ? ageOf(status.lastScheduleTime) : undefined),
+      row('Last success', status.lastSuccessfulTime ? ageOf(status.lastSuccessfulTime) : undefined),
+      row('Active jobs', Array.isArray(status.active) ? status.active.length : undefined),
     ]),
     section('Container', containerRows(spec.jobTemplate?.spec?.template?.spec?.containers)),
   ];
@@ -199,8 +199,8 @@ function serviceSummary(manifest: Manifest): Array<SummarySection | undefined> {
   const ingress: any[] = manifest.status?.loadBalancer?.ingress ?? [];
   return [
     section('Service', [
-      row('Typ', spec.type),
-      row('Cluster-IP', spec.clusterIP, { mono: true }),
+      row('Type', spec.type),
+      row('Cluster IP', spec.clusterIP, { mono: true }),
       row(
         'External',
         ingress.map((entry) => entry.ip ?? entry.hostname).join(', ') || spec.externalName,
@@ -242,7 +242,7 @@ function ingressSummary(manifest: Manifest): Array<SummarySection | undefined> {
       row('Address', lbIngress.map((entry) => entry.ip ?? entry.hostname).join(', '), { mono: true }),
       row('TLS', Array.isArray(spec.tls) ? spec.tls.map((tls: any) => tls.secretName).join(', ') : undefined),
     ]),
-    section('Routen', rows),
+    section('Routes', rows),
   ];
 }
 
@@ -250,16 +250,16 @@ function dataKeysSummary(manifest: Manifest, kind: string): Array<SummarySection
   const data = { ...(manifest.data ?? {}), ...(manifest.binaryData ?? {}), ...(manifest.stringData ?? {}) };
   const keys = Object.keys(data);
   return [
-    section(kind === 'Secret' ? 'Secret' : 'Daten', [
-      kind === 'Secret' ? row('Typ', manifest.type, { mono: true }) : undefined,
-      row('Einträge', keys.length),
+    section(kind === 'Secret' ? 'Secret' : 'Data', [
+      kind === 'Secret' ? row('Type', manifest.type, { mono: true }) : undefined,
+      row('Entries', keys.length),
     ]),
     section(
-      'Schlüssel',
+      'Keys',
       keys.map((key) =>
         row(
           key,
-          kind === 'Secret' ? '••••••' : `${String(data[key]).length} Zeichen`,
+          kind === 'Secret' ? '••••••' : `${String(data[key]).length} characters`,
           { mono: true }
         )
       )
@@ -273,7 +273,7 @@ function nodeSummary(manifest: Manifest): Array<SummarySection | undefined> {
   const info = status.nodeInfo ?? {};
   return [
     section('Node', [
-      row('Schedulable', manifest.spec?.unschedulable ? 'nein (cordoned)' : 'ja', {
+      row('Schedulable', manifest.spec?.unschedulable ? 'no (cordoned)' : 'yes', {
         status: manifest.spec?.unschedulable ? 'warn' : 'ok',
       }),
       ...addresses.map((address) => row(address.type, address.address, { mono: true })),
@@ -281,7 +281,7 @@ function nodeSummary(manifest: Manifest): Array<SummarySection | undefined> {
       row('OS', `${info.osImage ?? ''} (${info.architecture ?? ''})`),
       row('Runtime', info.containerRuntimeVersion, { mono: true }),
     ]),
-    section('Kapazität', [
+    section('Capacity', [
       row('CPU', `${status.allocatable?.cpu ?? '?'} / ${status.capacity?.cpu ?? '?'}`),
       row('Memory', `${status.allocatable?.memory ?? '?'} / ${status.capacity?.memory ?? '?'}`),
       row('Pods', `${status.allocatable?.pods ?? '?'} / ${status.capacity?.pods ?? '?'}`),
@@ -297,7 +297,7 @@ function pvcSummary(manifest: Manifest): Array<SummarySection | undefined> {
     section('Volume Claim', [
       row('Status', status.phase, { status: status.phase === 'Bound' ? 'ok' : 'warn' }),
       row('Volume', spec.volumeName, { mono: true }),
-      row('Kapazität', status.capacity?.storage ?? spec.resources?.requests?.storage),
+      row('Capacity', status.capacity?.storage ?? spec.resources?.requests?.storage),
       row('StorageClass', spec.storageClassName),
       row('Access Modes', (spec.accessModes ?? []).join(', ')),
     ]),
@@ -312,7 +312,7 @@ function pvSummary(manifest: Manifest): Array<SummarySection | undefined> {
     section('Volume', [
       row('Status', status.phase, { status: status.phase === 'Bound' ? 'ok' : 'warn' }),
       row('Claim', claim, { mono: true }),
-      row('Kapazität', spec.capacity?.storage),
+      row('Capacity', spec.capacity?.storage),
       row('StorageClass', spec.storageClassName),
       row('Reclaim Policy', spec.persistentVolumeReclaimPolicy),
       row('Access Modes', (spec.accessModes ?? []).join(', ')),
@@ -324,12 +324,12 @@ function eventSummary(manifest: Manifest): Array<SummarySection | undefined> {
   const involved = manifest.involvedObject ?? manifest.regarding ?? {};
   return [
     section('Event', [
-      row('Typ', manifest.type, { status: manifest.type === 'Normal' ? 'ok' : 'warn' }),
+      row('Type', manifest.type, { status: manifest.type === 'Normal' ? 'ok' : 'warn' }),
       row('Reason', manifest.reason),
-      row('Nachricht', manifest.message ?? manifest.note),
-      row('Objekt', involved.kind ? `${involved.kind}/${involved.name}` : undefined, { mono: true }),
-      row('Anzahl', manifest.count ?? manifest.deprecatedCount),
-      row('Zuletzt', ageOf(manifest.lastTimestamp ?? manifest.deprecatedLastTimestamp ?? manifest.eventTime)),
+      row('Message', manifest.message ?? manifest.note),
+      row('Object', involved.kind ? `${involved.kind}/${involved.name}` : undefined, { mono: true }),
+      row('Count', manifest.count ?? manifest.deprecatedCount),
+      row('Last seen', ageOf(manifest.lastTimestamp ?? manifest.deprecatedLastTimestamp ?? manifest.eventTime)),
     ]),
   ];
 }
@@ -340,10 +340,10 @@ function hpaSummary(manifest: Manifest): Array<SummarySection | undefined> {
   const target = spec.scaleTargetRef ? `${spec.scaleTargetRef.kind}/${spec.scaleTargetRef.name}` : undefined;
   return [
     section('Autoscaler', [
-      row('Ziel', target, { mono: true }),
+      row('Target', target, { mono: true }),
       row('Min / Max', `${spec.minReplicas ?? 1} / ${spec.maxReplicas ?? '?'}`),
-      row('Aktuell', status.currentReplicas),
-      row('Gewünscht', status.desiredReplicas),
+      row('Current', status.currentReplicas),
+      row('Desired', status.desiredReplicas),
     ]),
     conditionsSection(manifest),
   ];

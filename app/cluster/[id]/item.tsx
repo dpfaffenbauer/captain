@@ -756,7 +756,7 @@ export default function ResourceItemScreen() {
             <View style={styles.crashCard}>
               <Text style={styles.crashTitle}>Why is this crashing?</Text>
               <Text style={styles.crashBody}>
-                Container „{crash.container}" is crash-looping ({crash.restarts} restarts).
+                Container "{crash.container}" is crash-looping ({crash.restarts} restarts).
               </Text>
               <Text style={styles.crashMono}>{crash.message}</Text>
               <TouchableOpacity onPress={() => openLogs(true)}>
@@ -774,7 +774,7 @@ export default function ResourceItemScreen() {
               {/* Parent resources (ownerReferences, plus the node for pods) */}
               {owners.length > 0 || nodeName ? (
                 <Card style={styles.summaryCard}>
-                  <Text style={styles.cardTitle}>Übergeordnet</Text>
+                  <Text style={styles.cardTitle}>Owned by</Text>
                   {owners.map(({ ref, ownerType }, index) => (
                     <TouchableOpacity
                       key={`${ref.kind}-${ref.name}`}
@@ -844,7 +844,7 @@ export default function ResourceItemScreen() {
                       );
                     })}
                     {group.items.length > 25 ? (
-                      <Text style={styles.relatedMore}>+{group.items.length - 25} weitere</Text>
+                      <Text style={styles.relatedMore}>+{group.items.length - 25} more</Text>
                     ) : null}
                   </Card>
                 ))}

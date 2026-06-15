@@ -92,8 +92,8 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="open" options={{ headerShown: false }} />
           <Stack.Screen name="cluster-form" options={{ title: 'Cluster' }} />
-          <Stack.Screen name="kubeconfig-import" options={{ title: 'Kubeconfig importieren' }} />
-          <Stack.Screen name="qr-scan" options={{ title: 'QR-Code scannen' }} />
+          <Stack.Screen name="kubeconfig-import" options={{ title: 'Import kubeconfig' }} />
+          <Stack.Screen name="qr-scan" options={{ title: 'Scan QR code' }} />
           <Stack.Screen name="cluster/[id]" options={{ headerShown: false }} />
         </Stack>
       </AppLockGate>
