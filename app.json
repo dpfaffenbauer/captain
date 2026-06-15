@@ -3,7 +3,7 @@
     "name": "Captain",
     "slug": "captain",
     "version": "1.0.0",
-    "scheme": "captain",
+    "scheme": ["captain", "com.googleusercontent.apps.484570136896-chbg23os8doul86cieiom5ob80d3q8oq"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
