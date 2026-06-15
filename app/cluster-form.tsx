@@ -29,12 +29,12 @@ import { colors, spacing } from '../src/ui/theme';
 import { newId } from '../src/util/format';
 
 const AUTH_TYPES: Array<{ type: AuthType; label: string; subtitle: string }> = [
-  { type: 'gke', label: 'Google GKE', subtitle: 'Mit Google anmelden' },
-  { type: 'aks', label: 'Azure AKS', subtitle: 'Mit Microsoft anmelden' },
-  { type: 'eks', label: 'AWS EKS', subtitle: 'IAM-Anmeldedaten' },
+  { type: 'gke', label: 'Google GKE', subtitle: 'Sign in with Google' },
+  { type: 'aks', label: 'Azure AKS', subtitle: 'Sign in with Microsoft' },
+  { type: 'eks', label: 'AWS EKS', subtitle: 'IAM credentials' },
   { type: 'oidc', label: 'OIDC / SSO', subtitle: 'Keycloak · Dex · Authentik' },
   { type: 'token', label: 'Token', subtitle: 'Bearer · ServiceAccount' },
-  { type: 'clientCert', label: 'Zertifikat', subtitle: 'mTLS · PKCS#12' },
+  { type: 'clientCert', label: 'Certificate', subtitle: 'mTLS · PKCS#12' },
 ];
 
 export default function ClusterFormScreen() {
@@ -156,21 +156,21 @@ export default function ClusterFormScreen() {
 
   const validate = (): string | undefined => {
     if (!server.trim().startsWith('http')) {
-      return 'Bitte eine gültige API-Server-URL angeben (https://…).';
+      return 'Please provide a valid API server URL (https://…).';
     }
-    if (authType === 'token' && !token.trim()) return 'Bitte ein Bearer-Token angeben.';
+    if (authType === 'token' && !token.trim()) return 'Please provide a Bearer token.';
     if (authType === 'clientCert') {
       const hasPemPair = clientCertData.trim().length > 0 && clientKeyData.trim().length > 0;
       if (!hasPemPair && !clientP12.trim()) {
-        return 'Für Zertifikats-Auth bitte Client-Zertifikat und Key angeben (PEM oder base64, wie in der Kubeconfig).';
+        return 'For certificate auth, please provide a client certificate and key (PEM or base64, as in the kubeconfig).';
       }
     }
     if (authType === 'eks' && (!eksRegion.trim() || !eksClusterName.trim() || !eksAccessKeyId.trim() || !eksSecretAccessKey.trim())) {
-      return 'Für EKS werden Region, Cluster-Name, Access Key und Secret Key benötigt.';
+      return 'EKS requires a region, cluster name, access key, and secret key.';
     }
-    if (authType === 'gke' && !oauthTokens) return 'Bitte zuerst mit Google anmelden.';
-    if (authType === 'aks' && !oauthTokens) return 'Bitte zuerst mit Microsoft anmelden.';
-    if (authType === 'oidc' && !oauthTokens) return 'Bitte zuerst beim OIDC-Provider anmelden.';
+    if (authType === 'gke' && !oauthTokens) return 'Please sign in with Google first.';
+    if (authType === 'aks' && !oauthTokens) return 'Please sign in with Microsoft first.';
+    if (authType === 'oidc' && !oauthTokens) return 'Please sign in with the OIDC provider first.';
     return undefined;
   };
 
@@ -207,7 +207,7 @@ export default function ClusterFormScreen() {
       const cluster = buildCluster();
       invalidateToken(cluster.id);
       const version = await getServerVersion(cluster);
-      Alert.alert('Verbindung erfolgreich', `Kubernetes ${version}`);
+      Alert.alert('Connection successful', `Kubernetes ${version}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -243,27 +243,27 @@ export default function ClusterFormScreen() {
       >
         {error ? <ErrorBox message={error} /> : null}
 
-        <Field label="Name" value={name} onChangeText={setName} placeholder="Mein Cluster" />
+        <Field label="Name" value={name} onChangeText={setName} placeholder="My cluster" />
         <Field
-          label="API-Server-URL"
+          label="API server URL"
           value={server}
           onChangeText={setServer}
           placeholder="https://1.2.3.4:6443"
           keyboardType="url"
         />
         <Field
-          label="Cluster-CA (PEM oder base64, optional)"
+          label="Cluster CA (PEM or base64, optional)"
           value={caData}
           onChangeText={setCaData}
-          placeholder="certificate-authority-data aus der Kubeconfig"
+          placeholder="certificate-authority-data from the kubeconfig"
           multiline
         />
         <TouchableOpacity style={styles.toggleRow} onPress={() => setInsecure(!insecure)}>
           <View style={[styles.checkbox, insecure && styles.checkboxChecked]} />
-          <Text style={styles.toggleLabel}>TLS-Verifizierung überspringen (unsicher)</Text>
+          <Text style={styles.toggleLabel}>Skip TLS verification (insecure)</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Anmelden mit</Text>
+        <Text style={styles.sectionTitle}>Sign in with</Text>
         <View style={styles.providerGrid}>
           {AUTH_TYPES.map((option) => (
             <ProviderTile
@@ -283,7 +283,7 @@ export default function ClusterFormScreen() {
 
         {authType === 'token' && (
           <Field
-            label="Bearer-Token (z. B. ServiceAccount-Token)"
+            label="Bearer token (e.g. ServiceAccount token)"
             value={token}
             onChangeText={setToken}
             placeholder="eyJhbGciOi…"
@@ -293,8 +293,8 @@ export default function ClusterFormScreen() {
 
         {authType === 'eks' && (
           <>
-            <Field label="AWS-Region" value={eksRegion} onChangeText={setEksRegion} placeholder="eu-central-1" />
-            <Field label="EKS-Cluster-Name" value={eksClusterName} onChangeText={setEksClusterName} placeholder="my-cluster" />
+            <Field label="AWS region" value={eksRegion} onChangeText={setEksRegion} placeholder="eu-central-1" />
+            <Field label="EKS cluster name" value={eksClusterName} onChangeText={setEksClusterName} placeholder="my-cluster" />
             <Field label="Access Key ID" value={eksAccessKeyId} onChangeText={setEksAccessKeyId} placeholder="AKIA…" />
             <Field
               label="Secret Access Key"
@@ -303,7 +303,7 @@ export default function ClusterFormScreen() {
               secureTextEntry
             />
             <Field
-              label="Session Token (optional, für temporäre Credentials)"
+              label="Session token (optional, for temporary credentials)"
               value={eksSessionToken}
               onChangeText={setEksSessionToken}
               multiline
@@ -315,7 +315,7 @@ export default function ClusterFormScreen() {
           <>
             {!DEFAULT_GKE_CLIENT_ID && (
               <Field
-                label="OAuth-Client-ID (iOS-Client aus der Google Cloud Console)"
+                label="OAuth client ID (iOS client from the Google Cloud Console)"
                 value={gkeClientId}
                 onChangeText={setGkeClientId}
                 placeholder="1234-abc.apps.googleusercontent.com"
@@ -323,7 +323,7 @@ export default function ClusterFormScreen() {
             )}
             <SignInButton
               provider="gke"
-              title={oauthTokens ? 'Mit Google verbunden ✓' : 'Mit Google anmelden'}
+              title={oauthTokens ? 'Connected with Google ✓' : 'Sign in with Google'}
               onPress={() => void handleOAuthSignIn()}
               disabled={!gkeClientId.trim()}
               busy={busy}
@@ -334,17 +334,17 @@ export default function ClusterFormScreen() {
 
         {authType === 'aks' && (
           <>
-            <Field label="Entra-Tenant-ID" value={aksTenantId} onChangeText={setAksTenantId} placeholder="00000000-0000-…" />
+            <Field label="Entra tenant ID" value={aksTenantId} onChangeText={setAksTenantId} placeholder="00000000-0000-…" />
             <Field
-              label="App-Registrierung Client-ID"
+              label="App registration client ID"
               value={aksClientId}
               onChangeText={setAksClientId}
               placeholder="00000000-0000-…"
             />
-            <Text style={styles.hint}>Redirect-URI für die App-Registrierung: {azureRedirect}</Text>
+            <Text style={styles.hint}>Redirect URI for the app registration: {azureRedirect}</Text>
             <SignInButton
               provider="aks"
-              title={oauthTokens ? 'Mit Microsoft verbunden ✓' : 'Mit Microsoft anmelden'}
+              title={oauthTokens ? 'Connected with Microsoft ✓' : 'Sign in with Microsoft'}
               onPress={() => void handleOAuthSignIn()}
               disabled={!aksTenantId.trim() || !aksClientId.trim()}
               busy={busy}
@@ -356,42 +356,42 @@ export default function ClusterFormScreen() {
         {authType === 'oidc' && (
           <>
             <Field
-              label="Issuer-URL"
+              label="Issuer URL"
               value={oidcIssuer}
               onChangeText={setOidcIssuer}
               placeholder="https://keycloak.example.com/realms/main"
               keyboardType="url"
             />
             <Field
-              label="Client-ID"
+              label="Client ID"
               value={oidcClientId}
               onChangeText={setOidcClientId}
               placeholder="kubernetes"
             />
             <Field
-              label="Client-Secret (nur für confidential clients)"
+              label="Client secret (only for confidential clients)"
               value={oidcClientSecret}
               onChangeText={setOidcClientSecret}
               secureTextEntry
             />
             <Field
-              label="Zusätzliche Scopes (optional, z. B. groups)"
+              label="Additional scopes (optional, e.g. groups)"
               value={oidcExtraScopes}
               onChangeText={setOidcExtraScopes}
               placeholder="groups"
             />
-            <Text style={styles.hint}>Redirect-URI für den OIDC-Client: {oidcRedirect}</Text>
+            <Text style={styles.hint}>Redirect URI for the OIDC client: {oidcRedirect}</Text>
             <SignInButton
               provider="oidc"
-              title={oauthTokens ? 'Angemeldet ✓ – erneut anmelden' : 'Mit SSO anmelden'}
+              title={oauthTokens ? 'Signed in ✓ – sign in again' : 'Sign in with SSO'}
               onPress={() => void handleOAuthSignIn()}
               disabled={!oidcIssuer.trim() || !oidcClientId.trim()}
               busy={busy}
               connected={!!oauthTokens}
             />
             <Text style={styles.hint}>
-              Der API-Server muss mit passenden --oidc-issuer-url/--oidc-client-id-Flags
-              konfiguriert sein; Captain sendet das ID-Token als Bearer.
+              The API server must be configured with matching --oidc-issuer-url/--oidc-client-id
+              flags; Captain sends the ID token as a Bearer token.
             </Text>
           </>
         )}
@@ -399,31 +399,31 @@ export default function ClusterFormScreen() {
         {(authType === 'clientCert' || clientCertData.length > 0 || clientP12.length > 0) && (
           <>
             <Field
-              label="Client-Zertifikat (PEM oder base64)"
+              label="Client certificate (PEM or base64)"
               value={clientCertData}
               onChangeText={setClientCertData}
-              placeholder="client-certificate-data aus der Kubeconfig"
+              placeholder="client-certificate-data from the kubeconfig"
               multiline
             />
             <Field
-              label="Client-Key (PEM oder base64)"
+              label="Client key (PEM or base64)"
               value={clientKeyData}
               onChangeText={setClientKeyData}
-              placeholder="client-key-data aus der Kubeconfig"
+              placeholder="client-key-data from the kubeconfig"
               multiline
             />
             <Text style={styles.hint}>
-              Alternativ kann statt Zertifikat + Key ein PKCS#12-Bundle hinterlegt werden:
+              Alternatively, a PKCS#12 bundle can be provided instead of a certificate + key:
             </Text>
             <Field
               label="PKCS#12 (base64, optional)"
               value={clientP12}
               onChangeText={setClientP12}
-              placeholder="base64 von: openssl pkcs12 -export -in client.crt -inkey client.key"
+              placeholder="base64 of: openssl pkcs12 -export -in client.crt -inkey client.key"
               multiline
             />
             <Field
-              label="PKCS#12-Passwort"
+              label="PKCS#12 password"
               value={clientP12Password}
               onChangeText={setClientP12Password}
               secureTextEntry
@@ -432,8 +432,8 @@ export default function ClusterFormScreen() {
         )}
 
         <View style={styles.actions}>
-          <Button title="Verbindung testen" variant="secondary" onPress={() => void handleTest()} busy={busy} />
-          <Button title="Speichern" onPress={() => void handleSave()} />
+          <Button title="Test connection" variant="secondary" onPress={() => void handleTest()} busy={busy} />
+          <Button title="Save" onPress={() => void handleSave()} />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

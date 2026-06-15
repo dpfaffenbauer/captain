@@ -24,15 +24,15 @@ export default function QrScanScreen() {
       }
       const warnings = contexts.flatMap((entry) => entry.warnings);
       Alert.alert(
-        'Kubeconfig importiert',
-        `${contexts.length} ${contexts.length === 1 ? 'Kontext' : 'Kontexte'} übernommen.` +
+        'Kubeconfig imported',
+        `${contexts.length} ${contexts.length === 1 ? 'context' : 'contexts'} imported.` +
           (warnings.length > 0 ? `\n\n⚠ ${warnings[0]}` : ''),
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (caught) {
       setError(
         caught instanceof Error
-          ? `QR-Code enthält keine gültige Kubeconfig: ${caught.message}`
+          ? `QR code does not contain a valid kubeconfig: ${caught.message}`
           : String(caught)
       );
       // Allow another attempt after a short pause.
@@ -42,15 +42,15 @@ export default function QrScanScreen() {
     }
   };
 
-  if (!permission) return <EmptyState message="Kamera wird vorbereitet…" />;
+  if (!permission) return <EmptyState message="Preparing camera…" />;
 
   if (!permission.granted) {
     return (
       <View style={styles.permissionWrap}>
         <Text style={styles.permissionText}>
-          Captain braucht Kamerazugriff, um Kubeconfig-QR-Codes zu scannen.
+          Captain needs camera access to scan kubeconfig QR codes.
         </Text>
-        <Button title="Kamera erlauben" onPress={() => void requestPermission()} />
+        <Button title="Allow camera" onPress={() => void requestPermission()} />
       </View>
     );
   }
@@ -65,8 +65,8 @@ export default function QrScanScreen() {
       <View style={styles.overlay} pointerEvents="none">
         <View style={styles.frame} />
         <Text style={styles.hint}>
-          Kubeconfig als QR-Code scannen{'\n'}
-          <Text style={styles.hintSmall}>z. B.: kubectl config view --minify --raw | qrencode -t png</Text>
+          Scan kubeconfig as QR code{'\n'}
+          <Text style={styles.hintSmall}>e.g.: kubectl config view --minify --raw | qrencode -t png</Text>
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>

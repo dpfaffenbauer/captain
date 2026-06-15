@@ -56,7 +56,7 @@ export async function getBearerToken(cluster: ClusterConfig): Promise<string | u
   }
   if (!auth.refreshToken) {
     throw new Error(
-      'Kein gültiges Zugriffstoken und kein Refresh-Token vorhanden. Bitte erneut anmelden.'
+      'No valid access token and no refresh token available. Please sign in again.'
     );
   }
 

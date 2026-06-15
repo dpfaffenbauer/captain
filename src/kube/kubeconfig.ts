@@ -4,8 +4,8 @@ import { AuthConfig, ClusterConfig } from '../types';
 import { newId } from '../util/format';
 
 const GKE_IMPORT_WARNING = DEFAULT_GKE_CLIENT_ID
-  ? 'GKE: Bitte mit Google anmelden.'
-  : 'GKE: Bitte OAuth-Client-ID eintragen und mit Google anmelden.';
+  ? 'GKE: Please sign in with Google.'
+  : 'GKE: Please enter an OAuth client ID and sign in with Google.';
 
 export interface ImportedContext {
   contextName: string;
@@ -40,7 +40,7 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
     if (command.includes('aws') || args.includes('eks')) {
       const region = execArg(args, '--region') ?? '';
       const clusterName = execArg(args, '--cluster-name') ?? execArg(args, '--cluster-id') ?? '';
-      warnings.push('EKS: AWS Access Key und Secret Key müssen noch eingetragen werden.');
+      warnings.push('EKS: AWS access key and secret key still need to be entered.');
       return {
         type: 'eks',
         region,
@@ -55,7 +55,7 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
     }
     // int128/kubelogin (oidc-login) carries the issuer in its args.
     if (args.some((arg) => arg.startsWith('--oidc-issuer-url'))) {
-      warnings.push('OIDC: Bitte beim Provider anmelden, um Tokens zu erhalten.');
+      warnings.push('OIDC: Please sign in with the provider to obtain tokens.');
       return {
         type: 'oidc',
         issuer: execArg(args, '--oidc-issuer-url') ?? '',
@@ -64,10 +64,10 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
       };
     }
     if (command.includes('kubelogin') || args.some((arg) => arg.includes('azure'))) {
-      warnings.push('AKS: Bitte Tenant-ID und Client-ID eintragen und mit Microsoft anmelden.');
+      warnings.push('AKS: Please enter the tenant ID and client ID and sign in with Microsoft.');
       return { type: 'aks', tenantId: execArg(args, '--tenant-id') ?? '', clientId: '' };
     }
-    warnings.push(`Exec-Plugin "${command}" wird nicht unterstützt; bitte Auth manuell konfigurieren.`);
+    warnings.push(`Exec plugin "${command}" is not supported; please configure auth manually.`);
     return { type: 'token', token: '' };
   }
 
@@ -77,11 +77,11 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
     return { type: 'gke', clientId: DEFAULT_GKE_CLIENT_ID };
   }
   if (authProvider?.name === 'azure') {
-    warnings.push('AKS: Bitte Tenant-ID und Client-ID eintragen und mit Microsoft anmelden.');
+    warnings.push('AKS: Please enter the tenant ID and client ID and sign in with Microsoft.');
     return { type: 'aks', tenantId: authProvider.config?.['tenant-id'] ?? '', clientId: '' };
   }
   if (authProvider?.name === 'oidc') {
-    warnings.push('OIDC: Bitte beim Provider anmelden, um Tokens zu erhalten.');
+    warnings.push('OIDC: Please sign in with the provider to obtain tokens.');
     return {
       type: 'oidc',
       issuer: authProvider.config?.['idp-issuer-url'] ?? '',
@@ -92,18 +92,18 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
 
   if (typeof user['client-certificate-data'] === 'string') {
     if (typeof user['client-key-data'] !== 'string') {
-      warnings.push('Client-Zertifikat gefunden, aber kein Key (client-key-data); bitte im Formular ergänzen.');
+      warnings.push('Client certificate found, but no key (client-key-data); please add it in the form.');
     }
     return { type: 'clientCert' };
   }
   if (typeof user['client-certificate'] === 'string') {
     warnings.push(
-      'Client-Zertifikat liegt als Dateipfad vor; bitte den Inhalt von Zertifikat und Key (PEM) im Formular einfügen.'
+      'Client certificate is given as a file path; please paste the certificate and key contents (PEM) into the form.'
     );
     return { type: 'clientCert' };
   }
 
-  warnings.push('Keine unterstützte Authentifizierung gefunden; bitte manuell konfigurieren.');
+  warnings.push('No supported authentication found; please configure it manually.');
   return { type: 'token', token: '' };
 }
 
@@ -111,7 +111,7 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
 export function parseKubeconfig(text: string): ImportedContext[] {
   const parsed = yaml.load(text) as KubeconfigFile | undefined;
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error('Kubeconfig konnte nicht gelesen werden');
+    throw new Error('Could not read the kubeconfig');
   }
   const clusters = new Map((parsed.clusters ?? []).map((entry) => [entry.name, entry.cluster]));
   const users = new Map((parsed.users ?? []).map((entry) => [entry.name, entry.user]));
@@ -148,7 +148,7 @@ export function parseKubeconfig(text: string): ImportedContext[] {
     });
   }
   if (results.length === 0) {
-    throw new Error('Kubeconfig enthält keine verwendbaren Kontexte');
+    throw new Error('The kubeconfig contains no usable contexts');
   }
   return results;
 }

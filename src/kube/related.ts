@@ -169,18 +169,18 @@ export function describeChild(type: ApiResourceType, raw: any): ChildInfo {
   if (key === 'apps/ReplicaSet' || key === '/ReplicationController') {
     const desired = raw.spec?.replicas ?? 0;
     const ready = raw.status?.readyReplicas ?? 0;
-    if (desired === 0) return { detail: 'auf 0 skaliert' };
-    return { detail: `${ready}/${desired} bereit`, health: ready >= desired ? 'ok' : 'warn' };
+    if (desired === 0) return { detail: 'scaled to 0' };
+    return { detail: `${ready}/${desired} ready`, health: ready >= desired ? 'ok' : 'warn' };
   }
   if (key === 'batch/Job') {
     const completions = raw.spec?.completions ?? 1;
     const succeeded = raw.status?.succeeded ?? 0;
     const failed = raw.status?.failed ?? 0;
     const active = raw.status?.active ?? 0;
-    if (active > 0) return { detail: `läuft · ${succeeded}/${completions}`, health: 'warn' };
-    if (succeeded >= completions) return { detail: `${succeeded}/${completions} abgeschlossen`, health: 'ok' };
-    if (failed > 0) return { detail: `fehlgeschlagen (${failed}×)`, health: 'bad' };
-    return { detail: `${succeeded}/${completions} abgeschlossen`, health: 'warn' };
+    if (active > 0) return { detail: `running · ${succeeded}/${completions}`, health: 'warn' };
+    if (succeeded >= completions) return { detail: `${succeeded}/${completions} completed`, health: 'ok' };
+    if (failed > 0) return { detail: `failed (${failed}×)`, health: 'bad' };
+    return { detail: `${succeeded}/${completions} completed`, health: 'warn' };
   }
   return { detail: '' };
 }

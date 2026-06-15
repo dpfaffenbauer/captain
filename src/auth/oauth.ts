@@ -81,8 +81,8 @@ async function signIn(
   if (result.type !== 'success' || !result.params.code) {
     throw new Error(
       result.type === 'error'
-        ? result.error?.message ?? 'Anmeldung fehlgeschlagen'
-        : 'Anmeldung abgebrochen'
+        ? result.error?.message ?? 'Sign-in failed'
+        : 'Sign-in canceled'
     );
   }
   const tokenResponse = await AuthSession.exchangeCodeAsync(
