@@ -17,6 +17,20 @@ const GOOGLE_DISCOVERY: AuthSession.DiscoveryDocument = {
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
 };
 
+/**
+ * Built-in Google OAuth client used as the default for GKE sign-in, so users
+ * don't have to register and paste their own client ID — the GKE flow becomes a
+ * single tap. Must be a Google OAuth client of type **iOS** (no client secret;
+ * the redirect URI is the reversed client ID — see googleRedirectUri). A
+ * desktop/web client will NOT work, since iOS only supports the custom-scheme
+ * redirect that iOS clients provide.
+ *
+ * While empty, the UI falls back to asking the user for their own client ID.
+ * Set this to Captain's registered iOS client ID to enable one-tap sign-in.
+ */
+export const DEFAULT_GKE_CLIENT_ID: string =
+  '484570136896-chbg23os8doul86cieiom5ob80d3q8oq.apps.googleusercontent.com';
+
 /** Scope of the AKS AAD server application (fixed ID for all AKS clusters). */
 export const AKS_SERVER_APP_ID = '6dae42f8-4368-4678-94ff-3960e28e3630';
 
