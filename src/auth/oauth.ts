@@ -28,7 +28,8 @@ const GOOGLE_DISCOVERY: AuthSession.DiscoveryDocument = {
  * While empty, the UI falls back to asking the user for their own client ID.
  * Set this to Captain's registered iOS client ID to enable one-tap sign-in.
  */
-export const DEFAULT_GKE_CLIENT_ID: string = '';
+export const DEFAULT_GKE_CLIENT_ID: string =
+  '484570136896-chbg23os8doul86cieiom5ob80d3q8oq.apps.googleusercontent.com';
 
 /** Scope of the AKS AAD server application (fixed ID for all AKS clusters). */
 export const AKS_SERVER_APP_ID = '6dae42f8-4368-4678-94ff-3960e28e3630';
