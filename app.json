@@ -18,7 +18,7 @@
           "NSAllowsArbitraryLoads": true
         },
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "Captain schützt gespeicherte Cluster-Zugangsdaten mit Face ID.",
+        "NSFaceIDUsageDescription": "Captain protects stored cluster credentials with Face ID.",
         "NSSupportsLiveActivities": true
       },
       "appleTeamId": "UJ65F5V824"
@@ -50,7 +50,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Captain nutzt die Kamera, um Kubeconfig-QR-Codes zu scannen."
+          "cameraPermission": "Captain uses the camera to scan kubeconfig QR codes."
         }
       ]
     ],
