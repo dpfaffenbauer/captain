@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
 import React from 'react';
+import { useClusterNav } from '../state/ClusterNav';
 import { useClusters } from '../state/ClustersContext';
 import { detailKey, useDetailSelection } from '../state/DetailSelection';
 import { useDock } from '../state/DockContext';
@@ -12,7 +12,7 @@ import { SidePane } from './SidePane';
  * useDetailSelection. Logs/exec route to the bottom dock instead.
  */
 export function DetailSidebar({ clusterId }: { clusterId: string }) {
-  const router = useRouter();
+  const nav = useClusterNav();
   const { getById } = useClusters();
   const cluster = getById(clusterId);
   const { stack, push, back, close } = useDetailSelection();
@@ -34,9 +34,7 @@ export function DetailSidebar({ clusterId }: { clusterId: string }) {
         }}
         onBack={stack.length > 1 ? back : undefined}
         onClose={close}
-        onShowForwards={() =>
-          router.push({ pathname: '/cluster/[id]/forwards', params: { id: clusterId } })
-        }
+        onShowForwards={() => nav.show({ kind: 'forwards' })}
       />
     </SidePane>
   );

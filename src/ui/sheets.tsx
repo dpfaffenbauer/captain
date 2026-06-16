@@ -1,10 +1,22 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { listNamespaces } from '../kube/client';
 import { PromAlert } from '../kube/prometheus';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
+import { ConnectionState, useClusterStatus } from '../state/ClusterStatusContext';
+import { useClusterSwitch } from '../state/ClusterSwitch';
 import { useClusters } from '../state/ClustersContext';
 import { ClusterConfig } from '../types';
 import {
@@ -21,6 +33,19 @@ import { ageOf } from '../util/format';
 import { hapticWarning, loadHapticsSetting, setHapticsEnabled } from '../util/haptics';
 import { BottomSheet, StatusDot } from './kit';
 import { colors, radius } from './theme';
+
+function connectionColor(state: ConnectionState): string {
+  switch (state) {
+    case 'connected':
+      return colors.success;
+    case 'error':
+      return colors.danger;
+    case 'checking':
+      return colors.warning;
+    default:
+      return colors.textFaint;
+  }
+}
 
 function SheetRow({
   title,
@@ -50,6 +75,36 @@ function SheetRow({
   );
 }
 
+/**
+ * Tappable pill showing the active cluster; opens the cluster switcher sheet.
+ * Drop it into a screen header to switch clusters from anywhere.
+ */
+export function ClusterSwitcherButton({
+  cluster,
+  online = true,
+}: {
+  cluster: ClusterConfig;
+  online?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <TouchableOpacity style={styles.switcherPill} onPress={() => setOpen(true)}>
+        <StatusDot color={online ? colors.success : colors.danger} size={8} />
+        <Text style={styles.switcherPillText} numberOfLines={1}>
+          {cluster.name}
+        </Text>
+        <Text style={styles.switcherPillChevron}>⌄</Text>
+      </TouchableOpacity>
+      <ClusterSwitcherSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        activeCluster={cluster}
+      />
+    </>
+  );
+}
+
 export function ClusterSwitcherSheet({
   visible,
   onClose,
@@ -61,6 +116,8 @@ export function ClusterSwitcherSheet({
 }) {
   const router = useRouter();
   const { clusters } = useClusters();
+  const { switchTo } = useClusterSwitch();
+  const { statusOf } = useClusterStatus();
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Clusters">
       <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 10 }}>
@@ -69,13 +126,11 @@ export function ClusterSwitcherSheet({
             key={cluster.id}
             title={cluster.name}
             subtitle={cluster.server.replace(/^https?:\/\//, '')}
-            dotColor={cluster.id === activeCluster.id ? colors.success : colors.textFaint}
+            dotColor={connectionColor(statusOf(cluster.id))}
             active={cluster.id === activeCluster.id}
             onPress={() => {
               onClose();
-              if (cluster.id !== activeCluster.id) {
-                router.replace(`/cluster/${cluster.id}` as never);
-              }
+              switchTo(cluster.id);
             }}
           />
         ))}
@@ -99,6 +154,85 @@ export function ClusterSwitcherSheet({
         <Text style={styles.homeText}>⌂ All clusters</Text>
       </TouchableOpacity>
     </BottomSheet>
+  );
+}
+
+export interface FlyoutAnchor {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Cluster switcher as a flyout panel anchored to its trigger — used in the
+ * iPad/macOS sidebar, where it drops out next to the cluster pill instead of
+ * sliding up as a full-width sheet. Pass the measured trigger rect as `anchor`.
+ */
+export function ClusterSwitcherFlyout({
+  visible,
+  onClose,
+  activeCluster,
+  anchor,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  activeCluster: ClusterConfig;
+  anchor: FlyoutAnchor | null;
+}) {
+  const router = useRouter();
+  const { clusters } = useClusters();
+  const { switchTo: switchCluster } = useClusterSwitch();
+  const { statusOf } = useClusterStatus();
+  const { height } = useWindowDimensions();
+  if (!anchor) return null;
+  const top = anchor.y + anchor.height + 6;
+
+  const switchTo = (id: string) => {
+    onClose();
+    switchCluster(id);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={[styles.flyout, { top, left: anchor.x, maxHeight: height - top - 24 }]}>
+        <ScrollView
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 8 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {clusters.map((cluster) => (
+            <SheetRow
+              key={cluster.id}
+              title={cluster.name}
+              subtitle={cluster.server.replace(/^https?:\/\//, '')}
+              dotColor={connectionColor(statusOf(cluster.id))}
+              active={cluster.id === activeCluster.id}
+              onPress={() => switchTo(cluster.id)}
+            />
+          ))}
+        </ScrollView>
+        <TouchableOpacity
+          style={styles.addRow}
+          onPress={() => {
+            onClose();
+            router.push('/cluster-form');
+          }}
+        >
+          <Text style={styles.addText}>+ Add cluster</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.homeRow}
+          onPress={() => {
+            onClose();
+            router.dismissTo('/');
+          }}
+        >
+          <Text style={styles.homeText}>⌂ All clusters</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
   );
 }
 
@@ -374,6 +508,36 @@ export function AlertSheet({
 }
 
 const styles = StyleSheet.create({
+  switcherPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 14,
+  },
+  switcherPillText: { color: colors.text, fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
+  switcherPillChevron: { color: colors.textDim, fontSize: 12, marginTop: -4 },
+  flyout: {
+    position: 'absolute',
+    width: 300,
+    backgroundColor: colors.sheet,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 16,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

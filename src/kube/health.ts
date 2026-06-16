@@ -31,6 +31,19 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+/**
+ * Cheap reachability probe — a single GET to /version. Used to drive the
+ * per-cluster connection dot without the cost of a full health snapshot.
+ */
+export async function pingCluster(cluster: ClusterConfig, timeoutMs = 6000): Promise<boolean> {
+  try {
+    await withTimeout(kubeRequestJson(cluster, '/version'), timeoutMs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isProblemPod(pod: any): boolean {
   const phase = pod.status?.phase;
   if (phase === 'Failed' || phase === 'Pending') return true;

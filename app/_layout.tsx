@@ -3,6 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { syncBackgroundAlerts } from '../src/background/alerts';
+import { ClusterSessionProvider } from '../src/state/ClusterSession';
+import { ClusterStatusProvider } from '../src/state/ClusterStatusContext';
 import { ClustersProvider } from '../src/state/ClustersContext';
 import { FavoritesProvider } from '../src/state/FavoritesContext';
 import { colors } from '../src/ui/theme';
@@ -78,6 +80,8 @@ export default function RootLayout() {
   return (
     <ClustersProvider>
       <FavoritesProvider>
+      <ClusterSessionProvider>
+      <ClusterStatusProvider>
       <StatusBar style="light" />
       <AppLockGate>
         <Stack
@@ -94,9 +98,16 @@ export default function RootLayout() {
           <Stack.Screen name="cluster-form" options={{ title: 'Cluster' }} />
           <Stack.Screen name="kubeconfig-import" options={{ title: 'Import kubeconfig' }} />
           <Stack.Screen name="qr-scan" options={{ title: 'Scan QR code' }} />
-          <Stack.Screen name="cluster/[id]" options={{ headerShown: false }} />
+          {/* No swipe-to-exit: leaving a cluster happens via the switcher, not
+              an accidental left-edge swipe. */}
+          <Stack.Screen
+            name="cluster/[id]"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
         </Stack>
       </AppLockGate>
+      </ClusterStatusProvider>
+      </ClusterSessionProvider>
       </FavoritesProvider>
     </ClustersProvider>
   );

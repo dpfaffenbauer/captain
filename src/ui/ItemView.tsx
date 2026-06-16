@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -48,6 +47,7 @@ import { hapticTap, hapticWarning } from '../util/haptics';
 import { ApiResourceType, ClusterConfig } from '../types';
 import { DetailTarget } from '../state/DetailSelection';
 import { BackButton, Card, CloseButton, SquircleIcon, StatusDot } from './kit';
+import { YamlEditor } from './YamlEditor';
 import { YamlView } from './YamlView';
 import { Button, EmptyState, ErrorBox, Loading } from './components';
 import { colors, radius, spacing } from './theme';
@@ -691,15 +691,7 @@ export function ItemView({
               <ErrorBox message={error} />
             </View>
           ) : null}
-          <TextInput
-            style={styles.editor}
-            value={draft}
-            onChangeText={setDraft}
-            multiline
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-          />
+          <YamlEditor value={draft} onChangeText={setDraft} />
           <View style={styles.editActions}>
             <Button title="Review & save" onPress={handleReview} busy={busy} />
             <Button
@@ -1029,15 +1021,5 @@ const styles = StyleSheet.create({
   diffLine: { color: colors.mono, fontFamily: 'Menlo', fontSize: 10.5, lineHeight: 17 },
   diffAdd: { color: colors.success, backgroundColor: 'rgba(52,211,153,0.1)' },
   diffDel: { color: colors.danger, backgroundColor: 'rgba(251,113,133,0.1)' },
-  editor: {
-    flex: 1,
-    backgroundColor: colors.backgroundDeep,
-    color: colors.text,
-    fontFamily: 'Menlo',
-    fontSize: 12,
-    lineHeight: 18,
-    padding: spacing.lg,
-    textAlignVertical: 'top',
-  },
   editActions: { padding: spacing.lg },
 });

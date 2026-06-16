@@ -11,6 +11,7 @@ import { ClusterConfig } from '../types';
 import { BackButton, Card, CloseButton, Pill, StatusDot } from './kit';
 import { EmptyState, ErrorBox, Loading } from './components';
 import { helmStatusColor } from './helmStatus';
+import { YamlView } from './YamlView';
 import { colors, radius, spacing } from './theme';
 import { ageOf } from '../util/format';
 
@@ -174,15 +175,23 @@ export function HelmReleaseView({
             </>
           ) : tab === 'values' ? (
             <Card style={styles.monoCard}>
-              <Text style={styles.mono} selectable>
-                {valuesYaml || '(no user-supplied values — chart defaults only)'}
-              </Text>
+              {valuesYaml ? (
+                <YamlView text={valuesYaml} />
+              ) : (
+                <Text style={styles.mono} selectable>
+                  (no user-supplied values — chart defaults only)
+                </Text>
+              )}
             </Card>
           ) : tab === 'manifest' ? (
             <Card style={styles.monoCard}>
-              <Text style={styles.mono} selectable>
-                {detail.manifest?.trim() || '(empty manifest)'}
-              </Text>
+              {detail.manifest?.trim() ? (
+                <YamlView text={detail.manifest.trim()} />
+              ) : (
+                <Text style={styles.mono} selectable>
+                  (empty manifest)
+                </Text>
+              )}
             </Card>
           ) : (
             <Card style={styles.monoCard}>

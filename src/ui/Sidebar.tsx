@@ -1,9 +1,10 @@
-import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { abbreviationFor, categorizeResourceTypes, ResourceCategory } from '../kube/categories';
 import { discoverResourceTypesCached } from '../kube/client';
+import { MasterView, useClusterNav } from '../state/ClusterNav';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
+import { ConnectionState, useClusterStatus } from '../state/ClusterStatusContext';
 import { useClusters } from '../state/ClustersContext';
 import { useFavorites } from '../state/FavoritesContext';
 import { favoriteKey } from '../storage/favorites';
@@ -11,7 +12,12 @@ import { ApiResourceType, FavoriteResource } from '../types';
 import { hapticTap } from '../util/haptics';
 import { SHORTCUTS, TabIcon } from './clusterTabs';
 import { SquircleIcon, StatusDot } from './kit';
-import { ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from './sheets';
+import {
+  ClusterSwitcherFlyout,
+  FlyoutAnchor,
+  NamespaceSheet,
+  SettingsSheet,
+} from './sheets';
 import { colors, radius, spacing } from './theme';
 
 /**
@@ -19,11 +25,23 @@ import { colors, radius, spacing } from './theme';
  * dashboard, and the full resource tree grouped into collapsible categories,
  * plus tool shortcuts. Tapping an entry swaps the content column in place.
  */
+function connectionColor(state: ConnectionState): string {
+  switch (state) {
+    case 'connected':
+      return colors.success;
+    case 'error':
+      return colors.danger;
+    case 'checking':
+      return colors.warning;
+    default:
+      return colors.textFaint;
+  }
+}
+
 export function Sidebar({ clusterId }: { clusterId: string }) {
-  const router = useRouter();
-  const segments = useSegments();
-  const routeParams = useLocalSearchParams<{ plural?: string; category?: string }>();
+  const nav = useClusterNav();
   const { getById } = useClusters();
+  const { statusOf } = useClusterStatus();
   const cluster = getById(clusterId);
   const { namespace } = useClusterScope();
   const { favorites, remove: removeFavorite } = useFavorites();
@@ -32,6 +50,8 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
   const [hasGitOps, setHasGitOps] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [switcherAnchor, setSwitcherAnchor] = useState<FlyoutAnchor | null>(null);
+  const pillRef = useRef<View>(null);
   const [nsOpen, setNsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -58,19 +78,19 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
 
   if (!cluster) return null;
 
-  const leaf = segments[segments.length - 1] ?? '';
-  const onDashboard = leaf === '[id]';
-  const onEvents = leaf === 'events';
-  const activePlural = leaf === 'list' || leaf === 'item' ? routeParams.plural : undefined;
-  const activeKindsCategory = leaf === 'kinds' ? routeParams.category : undefined;
+  const current = nav.current;
+  const onDashboard = current.kind === 'dashboard';
+  const onEvents = current.kind === 'events';
+  const activePlural = current.kind === 'list' ? current.type.plural : undefined;
+  const activeKindsCategory = current.kind === 'kinds' ? current.category : undefined;
   const activeShortcut =
-    leaf === 'helm' || leaf === 'helm-release'
+    current.kind === 'helm'
       ? 'helm'
-      : leaf === 'gitops'
+      : current.kind === 'gitops'
         ? 'gitops'
-        : leaf === 'forwards'
+        : current.kind === 'forwards'
           ? 'forwards'
-          : leaf === 'search'
+          : current.kind === 'search'
             ? 'search'
             : undefined;
 
@@ -79,59 +99,71 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
   const toggle = (key: string, collapsedByDefault?: boolean) =>
     setExpanded((current) => ({ ...current, [key]: !isExpanded(key, collapsedByDefault) }));
 
+  const viewForPath = (path: string): MasterView => {
+    switch (path) {
+      case 'events':
+        return { kind: 'events' };
+      case 'browse':
+        return { kind: 'browse' };
+      case 'helm':
+        return { kind: 'helm' };
+      case 'gitops':
+        return { kind: 'gitops' };
+      case 'forwards':
+        return { kind: 'forwards' };
+      case 'search':
+        return { kind: 'search' };
+      default:
+        return { kind: 'dashboard' };
+    }
+  };
+
   const go = (path: string) => {
     hapticTap();
-    router.replace(`/cluster/${clusterId}${path ? `/${path}` : ''}` as never);
+    nav.show(viewForPath(path));
   };
 
   const openType = (type: ApiResourceType) => {
     hapticTap();
-    router.replace({
-      pathname: '/cluster/[id]/list',
-      params: {
-        id: clusterId,
-        group: type.group,
-        version: type.version,
-        plural: type.plural,
-        kind: type.kind,
-        namespaced: type.namespaced ? '1' : '0',
-        verbs: type.verbs.join(','),
-      },
-    } as never);
+    nav.show({ kind: 'list', type });
   };
 
   const openKinds = (category: ResourceCategory) => {
     hapticTap();
-    router.replace({
-      pathname: '/cluster/[id]/kinds',
-      params: { id: clusterId, category: category.key, title: category.title },
-    } as never);
+    nav.show({ kind: 'kinds', category: category.key, title: category.title });
   };
 
   const openFavorite = (fav: FavoriteResource) => {
     hapticTap();
-    router.replace({
-      pathname: '/cluster/[id]/item',
-      params: {
-        id: clusterId,
+    nav.openItem(
+      {
         group: fav.group,
         version: fav.version,
         plural: fav.plural,
         kind: fav.kind,
-        namespaced: fav.namespaced ? '1' : '0',
-        verbs: fav.verbs.join(','),
-        name: fav.name,
-        namespace: fav.namespace ?? '',
+        namespaced: fav.namespaced,
+        verbs: fav.verbs,
       },
-    } as never);
+      fav.name,
+      fav.namespace
+    );
   };
 
   const clusterFavorites = favorites.filter((fav) => fav.clusterId === clusterId);
 
   return (
     <View style={styles.rail}>
-      <TouchableOpacity style={styles.clusterPill} onPress={() => setSwitcherOpen(true)}>
-        <StatusDot color={colors.success} size={9} />
+      <TouchableOpacity
+        ref={pillRef}
+        style={styles.clusterPill}
+        onPress={() => {
+          pillRef.current?.measureInWindow((x, y, width, height) => {
+            setSwitcherAnchor({ x, y, width, height });
+            setSwitcherOpen(true);
+          });
+        }}
+      >
+        <StatusDot color={connectionColor(statusOf(clusterId))} size={9} />
         <Text style={styles.clusterName} numberOfLines={1}>
           {cluster.name}
         </Text>
@@ -282,10 +314,11 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
         </TouchableOpacity>
       </View>
 
-      <ClusterSwitcherSheet
+      <ClusterSwitcherFlyout
         visible={switcherOpen}
         onClose={() => setSwitcherOpen(false)}
         activeCluster={cluster}
+        anchor={switcherAnchor}
       />
       <NamespaceSheet visible={nsOpen} onClose={() => setNsOpen(false)} cluster={cluster} />
       <SettingsSheet
