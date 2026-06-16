@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {
@@ -21,6 +20,7 @@ import { ApiResourceType } from '../../../src/types';
 import { Card, Pill, SquircleIcon } from '../../../src/ui/kit';
 import { NamespaceSheet } from '../../../src/ui/sheets';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
+import { useResponsiveLayout } from '../../../src/ui/useResponsiveLayout';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 
 export default function BrowseScreen() {
@@ -39,8 +39,7 @@ export default function BrowseScreen() {
     (forward) => forward.clusterId === id
   ).length;
   // iPad: don't stretch the category cards across the full width.
-  const { width } = useWindowDimensions();
-  const isWide = width >= 768;
+  const { isWide } = useResponsiveLayout();
 
   const load = useCallback(async () => {
     if (!cluster) return;

@@ -8,7 +8,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { listResources, restartRollout, scaleResource } from '../../../src/kube/client';
@@ -25,10 +24,11 @@ import { parseCpu, parseMemory } from '../../../src/kube/quantity';
 import { namespaceLabel, useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { ApiResourceType, KubeListItem } from '../../../src/types';
+import { useDetailSelection } from '../../../src/state/DetailSelection';
 import { BackButton, Card, Pill, StatusDot, UsageBar } from '../../../src/ui/kit';
-import { InspectorPlaceholder, ResourceInspector } from '../../../src/ui/ResourceInspector';
 import { NamespaceSheet } from '../../../src/ui/sheets';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
+import { useResponsiveLayout } from '../../../src/ui/useResponsiveLayout';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { ageOf } from '../../../src/util/format';
 
@@ -84,6 +84,7 @@ export default function ResourceListScreen() {
   const { getById } = useClusters();
   const cluster = getById(params.id);
   const { namespace } = useClusterScope();
+  const detail = useDetailSelection();
 
   const type = useMemo<ApiResourceType>(
     () => ({
@@ -106,11 +107,9 @@ export default function ResourceListScreen() {
   const [nsOpen, setNsOpen] = useState(false);
   const [usage, setUsage] = useState<Map<string, ResourceUsage> | null>(null);
   const [live, setLive] = useState(false);
-  const [selected, setSelected] = useState<KubeListItem | null>(null);
 
   // iPad / landscape: list on the left, inspector pane on the right.
-  const { width } = useWindowDimensions();
-  const isWide = width >= 768;
+  const { isWide } = useResponsiveLayout();
 
   const isPods = type.group === '' && type.kind === 'Pod';
   const isDeployments = type.group === 'apps' && type.kind === 'Deployment';
@@ -233,12 +232,20 @@ export default function ResourceListScreen() {
     );
   }, [items, filter]);
 
-  // A new kind or namespace invalidates the inspector selection.
-  useEffect(() => setSelected(null), [type, namespace]);
+  // A new kind or namespace invalidates the detail selection; so does leaving.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => detail.close(), [type, namespace]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => detail.close(), []);
 
   const handlePress = (item: KubeListItem) => {
     if (isWide) {
-      setSelected(item);
+      detail.open({
+        kind: 'item',
+        type,
+        name: item.name,
+        namespace: type.namespaced ? item.namespace : undefined,
+      });
     } else {
       openItem(item);
     }
@@ -300,10 +307,13 @@ export default function ResourceListScreen() {
 
   const renderItem = ({ item }: { item: KubeListItem }) => {
     const raw = item.raw as any;
+    const root = detail.stack[0];
     const isSelected =
       isWide &&
-      selected != null &&
-      `${selected.namespace ?? ''}/${selected.name}` === `${item.namespace ?? ''}/${item.name}`;
+      root?.kind === 'item' &&
+      root.type.plural === type.plural &&
+      root.name === item.name &&
+      (root.namespace ?? '') === (item.namespace ?? '');
     const selectionBorder = isSelected ? 'rgba(91,124,255,0.55)' : undefined;
 
     if (isPods) {
@@ -534,25 +544,6 @@ export default function ResourceListScreen() {
         </View>
       ) : loading ? (
         <Loading />
-      ) : isWide ? (
-        <View style={styles.splitRow}>
-          <View style={styles.splitList}>{listView}</View>
-          <View style={styles.splitDivider} />
-          <View style={styles.splitPane}>
-            {selected ? (
-              <ResourceInspector
-                key={`${selected.namespace ?? ''}/${selected.name}`}
-                cluster={cluster}
-                type={type}
-                name={selected.name}
-                namespace={selected.namespace}
-                onOpenFull={() => openItem(selected)}
-              />
-            ) : (
-              <InspectorPlaceholder />
-            )}
-          </View>
-        </View>
       ) : (
         listView
       )}
@@ -636,9 +627,5 @@ const styles = StyleSheet.create({
     padding: 13,
     borderRadius: radius.card,
   },
-  splitRow: { flex: 1, flexDirection: 'row' },
-  splitList: { width: 400 },
-  splitDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  splitPane: { flex: 1 },
   chevron: { color: 'rgba(242,245,250,0.22)', fontSize: 18, fontWeight: '600' },
 });

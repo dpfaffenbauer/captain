@@ -32,6 +32,7 @@ import { Card, HealthRing, Sparkline, StatusDot, UsageBar } from '../../../src/u
 import { AlertSheet, ClusterSwitcherSheet, NamespaceSheet, SettingsSheet } from '../../../src/ui/sheets';
 import { colors, radius, spacing } from '../../../src/ui/theme';
 import { EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
+import { useResponsiveLayout } from '../../../src/ui/useResponsiveLayout';
 import { ageOf } from '../../../src/util/format';
 
 const POD_TYPE: ApiResourceType = { group: '', version: 'v1', plural: 'pods', kind: 'Pod', namespaced: true, verbs: [] };
@@ -241,6 +242,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { getById, addOrUpdate } = useClusters();
   const cluster = getById(id);
+  const { isWide } = useResponsiveLayout();
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [prom, setProm] = useState<PromData | null>(null);
@@ -353,7 +355,7 @@ export default function DashboardScreen() {
       ) : data ? (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isWide && styles.scrollWide]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -650,6 +652,7 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: 130, gap: 12 },
+  scrollWide: { paddingBottom: 28 },
   hero: {
     flexDirection: 'row',
     alignItems: 'center',

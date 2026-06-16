@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { publishWidgetSnapshot, WidgetClusterEntry } from '../modules/captain-widget';
@@ -18,6 +17,7 @@ import { favoriteKey } from '../src/storage/favorites';
 import { ClusterConfig, FavoriteResource } from '../src/types';
 import { Card, SquircleIcon, StatusDot } from '../src/ui/kit';
 import { Loading } from '../src/ui/components';
+import { useResponsiveLayout } from '../src/ui/useResponsiveLayout';
 import { colors, radius, spacing } from '../src/ui/theme';
 
 const TONE_COLORS = {
@@ -89,8 +89,7 @@ export default function HomeScreen() {
   const { favorites, remove: removeFavorite } = useFavorites();
   const [health, setHealth] = useState<Record<string, ClusterHealth | null>>({});
   // iPad: keep the hero/cluster cards at a phone-ish width, centered.
-  const { width } = useWindowDimensions();
-  const isWide = width >= 768;
+  const { isWide } = useResponsiveLayout();
 
   // Probe every stored cluster in parallel whenever the home screen appears.
   useFocusEffect(
