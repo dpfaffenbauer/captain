@@ -141,10 +141,8 @@ export function BottomDock({ clusterId }: { clusterId: string }) {
 
 const styles = StyleSheet.create({
   dock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    // In-flow (not absolute): the dock pushes the content up instead of
+    // covering it, the opposite of the right detail overlay.
     backgroundColor: colors.backgroundDeep,
     borderTopColor: colors.border,
     borderTopWidth: 1,
@@ -153,7 +151,6 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: -8 },
     elevation: 16,
-    zIndex: 40,
   },
   handleZone: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
   handle: { width: 44, height: 4, borderRadius: 2, backgroundColor: colors.border },
@@ -195,16 +192,11 @@ const styles = StyleSheet.create({
   barGlyph: { color: colors.textDim, fontSize: 15, fontWeight: '700' },
   body: { flex: 1 },
   minimizedBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.backgroundDeep,
     borderTopColor: colors.border,
     borderTopWidth: 1,
     paddingHorizontal: spacing.sm,
-    zIndex: 40,
   },
 });

@@ -1,12 +1,13 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { syncBackgroundAlerts } from '../src/background/alerts';
 import { ClusterSessionProvider } from '../src/state/ClusterSession';
 import { ClusterStatusProvider } from '../src/state/ClusterStatusContext';
 import { ClustersProvider } from '../src/state/ClustersContext';
 import { FavoritesProvider } from '../src/state/FavoritesContext';
+import { UiScaleProvider, useUiScale } from '../src/state/UiScaleContext';
 import { colors } from '../src/ui/theme';
 import { authenticate, loadAppLockSetting } from '../src/util/applock';
 import { loadHapticsSetting } from '../src/util/haptics';
@@ -72,18 +73,46 @@ function AppLockGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Global interface zoom. "Designed for iPad" apps render at iPad point sizes,
+ * which feel tiny on a large macOS display — scaling the whole tree at the root
+ * enlarges text, spacing, and icons uniformly. The inner box is sized to
+ * window/scale so it still fills the screen after the transform.
+ */
+function ZoomContainer({ children }: { children: React.ReactNode }) {
+  const { scale } = useUiScale();
+  const { width, height } = useWindowDimensions();
+  if (scale === 1) return <>{children}</>;
+  return (
+    <View style={{ flex: 1, overflow: 'hidden' }}>
+      <View
+        style={{
+          width: width / scale,
+          height: height / scale,
+          transform: [{ scale }],
+          transformOrigin: 'left top',
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     void loadHapticsSetting();
     void syncBackgroundAlerts();
   }, []);
   return (
+    <UiScaleProvider>
     <ClustersProvider>
       <FavoritesProvider>
       <ClusterSessionProvider>
       <ClusterStatusProvider>
       <StatusBar style="light" />
       <AppLockGate>
+        <ZoomContainer>
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: colors.background },
@@ -105,11 +134,13 @@ export default function RootLayout() {
             options={{ headerShown: false, gestureEnabled: false }}
           />
         </Stack>
+        </ZoomContainer>
       </AppLockGate>
       </ClusterStatusProvider>
       </ClusterSessionProvider>
       </FavoritesProvider>
     </ClustersProvider>
+    </UiScaleProvider>
   );
 }
 

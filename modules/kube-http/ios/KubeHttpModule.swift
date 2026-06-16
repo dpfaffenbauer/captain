@@ -516,12 +516,15 @@ final class KubeExecRunner: NSObject, URLSessionWebSocketDelegate {
       self.session.finishTasksAndInvalidate()
       var errorString = String(data: self.errorJson, encoding: .utf8) ?? ""
       if errorString.isEmpty, let failure = failure { errorString = failure }
-      self.promise.resolve([
+      let result: [String: Any] = [
         "stdout": String(data: self.stdout, encoding: .utf8) ?? "",
         "stderr": String(data: self.stderr, encoding: .utf8) ?? "",
         "error": errorString,
         "timedOut": timedOut,
-      ])
+      ]
+      // Resolve on the main queue so the JSI promise is not torn down on this
+      // background queue (off the JS thread).
+      DispatchQueue.main.async { self.promise.resolve(result) }
     }
   }
 
@@ -976,13 +979,20 @@ public class KubeHttpModule: Module {
       }
 
       let task = session.dataTask(with: request) { data, response, error in
-        defer { session.finishTasksAndInvalidate() }
+        // Resolve on the main queue. Resolving (and thus releasing) the JSI
+        // promise on URLSession's background delegate queue can run the
+        // JavaScriptPromise/jsi::Object destructor off the JS thread, which
+        // crashes with EXC_BAD_ACCESS — especially under many concurrent
+        // requests (e.g. periodic cluster connection probes).
         if let error = error {
-          promise.reject("ERR_KUBE_NETWORK", kubeDescribeFailure(error, session: session))
+          let message = kubeDescribeFailure(error, session: session)
+          session.finishTasksAndInvalidate()
+          DispatchQueue.main.async { promise.reject("ERR_KUBE_NETWORK", message) }
           return
         }
         guard let httpResponse = response as? HTTPURLResponse else {
-          promise.reject("ERR_KUBE_NETWORK", "No HTTP response received")
+          session.finishTasksAndInvalidate()
+          DispatchQueue.main.async { promise.reject("ERR_KUBE_NETWORK", "No HTTP response received") }
           return
         }
         var headers: [String: String] = [:]
@@ -992,11 +1002,15 @@ public class KubeHttpModule: Module {
           }
         }
         let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        promise.resolve([
-          "status": httpResponse.statusCode,
-          "headers": headers,
-          "body": body,
-        ])
+        let statusCode = httpResponse.statusCode
+        session.finishTasksAndInvalidate()
+        DispatchQueue.main.async {
+          promise.resolve([
+            "status": statusCode,
+            "headers": headers,
+            "body": body,
+          ])
+        }
       }
       task.resume()
     }
@@ -1174,12 +1188,12 @@ public class KubeHttpModule: Module {
             if resolved { return }
             resolved = true
             self.forwards[id] = forward
-            promise.resolve(["id": id, "localPort": Int(port)])
+            DispatchQueue.main.async { promise.resolve(["id": id, "localPort": Int(port)]) }
           },
           onError: { message in
             if resolved { return }
             resolved = true
-            promise.reject("ERR_KUBE_FORWARD", message)
+            DispatchQueue.main.async { promise.reject("ERR_KUBE_FORWARD", message) }
           }
         )
       } catch {

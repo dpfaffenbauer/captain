@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from 'react-native';
 import { listResources, restartRollout, scaleResource } from '../../kube/client';
 import { KubeStreamHandle } from '../../kube/stream';
@@ -61,6 +62,20 @@ function podRestarts(raw: any): number {
   );
 }
 
+function nodeMeta(raw: any): { status: string; tone: string; role: string; version: string } {
+  const conditions: any[] = raw.status?.conditions ?? [];
+  const ready = conditions.find((c: any) => c.type === 'Ready')?.status === 'True';
+  const pressure = conditions.find((c: any) => c.type.endsWith('Pressure') && c.status === 'True');
+  const status = !ready ? 'NotReady' : pressure ? pressure.type : 'Ready';
+  const tone = !ready ? colors.danger : pressure ? colors.warning : colors.success;
+  const role =
+    Object.keys(raw.metadata?.labels ?? {})
+      .find((label: string) => label.startsWith('node-role.kubernetes.io/'))
+      ?.split('/')[1] ?? 'worker';
+  const version = raw.status?.nodeInfo?.kubeletVersion ?? '';
+  return { status, tone, role, version };
+}
+
 /** Problems first, like the design. */
 function sortPodsBySeverity(items: KubeListItem[]): KubeListItem[] {
   const rank = (item: KubeListItem) => {
@@ -91,6 +106,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
   const [nsOpen, setNsOpen] = useState(false);
   const [usage, setUsage] = useState<Map<string, ResourceUsage> | null>(null);
   const [live, setLive] = useState(false);
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
 
   // iPad / landscape: list on the left, inspector pane on the right.
   const { isWide } = useResponsiveLayout();
@@ -428,6 +444,181 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
 
   if (!cluster) return <EmptyState message="Cluster not found." />;
 
+  // Wide layout: a real table with per-kind columns (phone keeps cards).
+  const cellText = (value: string, muted?: boolean, color?: string) => (
+    <Text
+      style={[styles.cellText, muted && styles.cellMuted, color ? { color } : null]}
+      numberOfLines={1}
+    >
+      {value}
+    </Text>
+  );
+  const nameCell = (name: string, dotColor?: string) => (
+    <View style={styles.nameCell}>
+      {dotColor ? <StatusDot color={dotColor} size={8} /> : null}
+      <Text style={styles.cellName} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+  );
+
+  type Column = {
+    key: string;
+    label: string;
+    style: ViewStyle;
+    align?: 'right';
+    render: (item: KubeListItem) => React.ReactNode;
+    sortValue?: (item: KubeListItem) => string | number;
+  };
+
+  const ageValue = (item: KubeListItem) => Date.parse(item.creationTimestamp ?? '') || 0;
+  const nameValue = (item: KubeListItem) => item.name.toLowerCase();
+  const podRank = (raw: any) => {
+    const c = podSeverity(raw).color;
+    return c === colors.danger ? 0 : c === colors.warning ? 1 : 2;
+  };
+  const podReadyCount = (raw: any) =>
+    (raw.status?.containerStatuses ?? []).filter((s: any) => s.ready).length;
+
+  let columns: Column[];
+  if (isPods) {
+    columns = [
+      { key: 'name', label: 'Name', style: { flex: 2.4 }, sortValue: nameValue, render: (item) => nameCell(item.name, podSeverity(item.raw as any).color) },
+      { key: 'status', label: 'Status', style: { flex: 1.3 }, sortValue: (item) => podRank(item.raw as any), render: (item) => { const s = podSeverity(item.raw as any); return cellText(s.status, false, s.color); } },
+      { key: 'ready', label: 'Ready', style: { width: 64 }, sortValue: (item) => podReadyCount(item.raw as any), render: (item) => cellText(podReady(item.raw as any)) },
+      { key: 'restarts', label: 'Restarts', style: { width: 76 }, align: 'right', sortValue: (item) => podRestarts(item.raw as any), render: (item) => cellText(String(podRestarts(item.raw as any)), true) },
+      { key: 'cpu', label: 'CPU', style: { width: 78 }, align: 'right', sortValue: (item) => usage?.get(`${item.namespace ?? ''}/${item.name}`)?.cpu ?? -1, render: (item) => { const u = usage?.get(`${item.namespace ?? ''}/${item.name}`); return cellText(u ? formatCpuUsage(u.cpu) : '—', true); } },
+      { key: 'mem', label: 'Memory', style: { width: 92 }, align: 'right', sortValue: (item) => usage?.get(`${item.namespace ?? ''}/${item.name}`)?.memory ?? -1, render: (item) => { const u = usage?.get(`${item.namespace ?? ''}/${item.name}`); return cellText(u ? formatMemoryUsage(u.memory) : '—', true); } },
+      { key: 'age', label: 'Age', style: { width: 56 }, align: 'right', sortValue: ageValue, render: (item) => cellText(ageOf(item.creationTimestamp), true) },
+    ];
+  } else if (isNodes) {
+    columns = [
+      { key: 'name', label: 'Name', style: { flex: 2.2 }, sortValue: nameValue, render: (item) => nameCell(item.name, nodeMeta(item.raw as any).tone) },
+      { key: 'status', label: 'Status', style: { flex: 1 }, sortValue: (item) => nodeMeta(item.raw as any).status, render: (item) => { const m = nodeMeta(item.raw as any); return cellText(m.status, false, m.tone); } },
+      { key: 'role', label: 'Roles', style: { width: 96 }, sortValue: (item) => nodeMeta(item.raw as any).role, render: (item) => cellText(nodeMeta(item.raw as any).role) },
+      { key: 'version', label: 'Version', style: { width: 108 }, sortValue: (item) => nodeMeta(item.raw as any).version, render: (item) => cellText(nodeMeta(item.raw as any).version, true) },
+      { key: 'cpu', label: 'CPU', style: { width: 70 }, align: 'right', sortValue: (item) => { const u = usage?.get(item.name); const alloc = parseCpu((item.raw as any).status?.allocatable?.cpu); return u && alloc > 0 ? (u.cpu / alloc) * 100 : -1; }, render: (item) => { const u = usage?.get(item.name); const alloc = parseCpu((item.raw as any).status?.allocatable?.cpu); const pct = u && alloc > 0 ? (u.cpu / alloc) * 100 : undefined; return cellText(pct !== undefined ? `${Math.round(pct)}%` : '—', true); } },
+      { key: 'mem', label: 'Memory', style: { width: 80 }, align: 'right', sortValue: (item) => { const u = usage?.get(item.name); const alloc = parseMemory((item.raw as any).status?.allocatable?.memory); return u && alloc > 0 ? (u.memory / alloc) * 100 : -1; }, render: (item) => { const u = usage?.get(item.name); const alloc = parseMemory((item.raw as any).status?.allocatable?.memory); const pct = u && alloc > 0 ? (u.memory / alloc) * 100 : undefined; return cellText(pct !== undefined ? `${Math.round(pct)}%` : '—', true); } },
+      { key: 'age', label: 'Age', style: { width: 56 }, align: 'right', sortValue: ageValue, render: (item) => cellText(ageOf(item.creationTimestamp), true) },
+    ];
+  } else if (isDeployments) {
+    columns = [
+      { key: 'name', label: 'Name', style: { flex: 2.6 }, sortValue: nameValue, render: (item) => nameCell(item.name) },
+      { key: 'ready', label: 'Ready', style: { width: 90 }, sortValue: (item) => { const raw = item.raw as any; const d = raw.spec?.replicas ?? 0; return d > 0 ? (raw.status?.readyReplicas ?? 0) / d : 0; }, render: (item) => { const raw = item.raw as any; const desired = raw.spec?.replicas ?? 0; const ready = raw.status?.readyReplicas ?? 0; const tone = ready >= desired && desired > 0 ? colors.success : desired === 0 ? colors.textDim : colors.warning; return cellText(`${ready}/${desired}`, false, tone); } },
+      { key: 'updated', label: 'Up-to-date', style: { width: 96 }, align: 'right', sortValue: (item) => (item.raw as any).status?.updatedReplicas ?? 0, render: (item) => cellText(String((item.raw as any).status?.updatedReplicas ?? 0), true) },
+      { key: 'available', label: 'Available', style: { width: 86 }, align: 'right', sortValue: (item) => (item.raw as any).status?.availableReplicas ?? 0, render: (item) => cellText(String((item.raw as any).status?.availableReplicas ?? 0), true) },
+      { key: 'age', label: 'Age', style: { width: 56 }, align: 'right', sortValue: ageValue, render: (item) => cellText(ageOf(item.creationTimestamp), true) },
+    ];
+  } else {
+    columns = [
+      { key: 'name', label: 'Name', style: { flex: 2.4 }, sortValue: nameValue, render: (item) => nameCell(item.name, colors.success) },
+      ...(type.namespaced
+        ? [{ key: 'ns', label: 'Namespace', style: { flex: 1.4 }, sortValue: (item: KubeListItem) => (item.namespace ?? '').toLowerCase(), render: (item: KubeListItem) => cellText(item.namespace ?? '', true) } as Column]
+        : []),
+      { key: 'age', label: 'Age', style: { width: 64 }, align: 'right', sortValue: ageValue, render: (item) => cellText(ageOf(item.creationTimestamp), true) },
+    ];
+  }
+
+  const toggleSort = (key: string) =>
+    setSort((current) =>
+      current?.key === key
+        ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' }
+    );
+
+  const sortedItems = (() => {
+    const col = sort && columns.find((c) => c.key === sort.key);
+    if (!sort || !col?.sortValue) return visibleItems;
+    const sortValue = col.sortValue;
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return [...visibleItems].sort((a, b) => {
+      const va = sortValue(a);
+      const vb = sortValue(b);
+      if (va < vb) return -dir;
+      if (va > vb) return dir;
+      return 0;
+    });
+  })();
+
+  const tableHeader = (
+    <View style={styles.tableHeader}>
+      {columns.map((col) => {
+        const active = sort?.key === col.key;
+        return (
+          <TouchableOpacity
+            key={col.key}
+            style={[col.style, styles.thCell, col.align === 'right' && styles.cellRightAlign]}
+            disabled={!col.sortValue}
+            onPress={() => toggleSort(col.key)}
+          >
+            <Text style={[styles.thText, active && styles.thTextActive]} numberOfLines={1}>
+              {col.label}
+              {active ? (sort?.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const renderTableRow = ({ item, index }: { item: KubeListItem; index: number }) => {
+    const root = detail.stack[0];
+    const isSelected =
+      root?.kind === 'item' &&
+      root.type.plural === type.plural &&
+      root.name === item.name &&
+      (root.namespace ?? '') === (item.namespace ?? '');
+    return (
+      <TouchableOpacity
+        style={[
+          styles.tableRow,
+          index % 2 === 1 && styles.tableRowAlt,
+          isSelected && styles.tableRowSelected,
+        ]}
+        onPress={() => handlePress(item)}
+      >
+        {columns.map((col) => (
+          <View key={col.key} style={[col.style, styles.cell, col.align === 'right' && styles.cellRightAlign]}>
+            {col.render(item)}
+          </View>
+        ))}
+      </TouchableOpacity>
+    );
+  };
+
+  const tableView = (
+    <FlatList
+      data={sortedItems}
+      keyExtractor={(item) => `${item.namespace ?? ''}/${item.name}`}
+      style={styles.table}
+      stickyHeaderIndices={[0]}
+      ListHeaderComponent={tableHeader}
+      ListEmptyComponent={<EmptyState message={`No ${type.plural} found.`} />}
+      ListFooterComponent={
+        continueToken ? (
+          <View style={{ padding: spacing.md }}>
+            <Button
+              title="Load more"
+              variant="secondary"
+              onPress={() => void load(false, continueToken)}
+            />
+          </View>
+        ) : null
+      }
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load(true);
+          }}
+          tintColor={colors.accent}
+        />
+      }
+      renderItem={renderTableRow}
+    />
+  );
+
   const listView = (
     <FlatList
       data={visibleItems}
@@ -503,6 +694,8 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
         </View>
       ) : loading ? (
         <Loading />
+      ) : isWide ? (
+        tableView
       ) : (
         listView
       )}
@@ -545,6 +738,43 @@ const styles = StyleSheet.create({
   liveTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   liveText: { color: colors.success, fontSize: 10.5, fontWeight: '700' },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: 60, gap: 9 },
+  table: { flex: 1 },
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    backgroundColor: colors.background,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  thCell: { justifyContent: 'center' },
+  thText: {
+    color: colors.textFaint,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  thTextActive: { color: colors.link },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    borderBottomColor: colors.borderFaint,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tableRowAlt: { backgroundColor: 'rgba(255,255,255,0.022)' },
+  tableRowSelected: { backgroundColor: 'rgba(91,124,255,0.1)' },
+  cell: { justifyContent: 'center' },
+  cellRightAlign: { alignItems: 'flex-end' },
+  nameCell: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cellName: { color: colors.text, fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  cellText: { color: colors.textMid, fontSize: 12.5 },
+  cellMuted: { color: colors.textDim },
   itemName: { color: colors.text, fontSize: 13.5, fontWeight: '600' },
   podCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
   podMetaRow: { flexDirection: 'row', gap: 9 },

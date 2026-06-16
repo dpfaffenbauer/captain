@@ -18,6 +18,7 @@ import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
 import { ConnectionState, useClusterStatus } from '../state/ClusterStatusContext';
 import { useClusterSwitch } from '../state/ClusterSwitch';
 import { useClusters } from '../state/ClustersContext';
+import { UI_SCALE_OPTIONS, useUiScale } from '../state/UiScaleContext';
 import { ClusterConfig } from '../types';
 import {
   loadBackgroundAlertsSetting,
@@ -288,6 +289,7 @@ export function SettingsSheet({
   const router = useRouter();
   const { clusters, remove } = useClusters();
   const { namespace } = useClusterScope();
+  const { scale, setScale } = useUiScale();
   const [haptics, setHaptics] = useState(true);
   const [appLock, setAppLock] = useState(false);
   const [biometrics, setBiometrics] = useState(false);
@@ -366,6 +368,28 @@ export function SettingsSheet({
             }}
             trackColor={{ true: colors.accent, false: 'rgba(255,255,255,0.14)' }}
           />
+        </View>
+        <View style={[styles.settingRow, styles.settingDivider]}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.settingTitle}>Interface size</Text>
+            <Text style={styles.rowSub}>Scale text and controls (bigger on macOS)</Text>
+          </View>
+          <View style={styles.segment}>
+            {UI_SCALE_OPTIONS.map((option) => {
+              const active = Math.abs(scale - option.value) < 0.001;
+              return (
+                <TouchableOpacity
+                  key={option.label}
+                  style={[styles.segmentItem, active && styles.segmentItemActive]}
+                  onPress={() => setScale(option.value)}
+                >
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
         <View style={[styles.settingRow, styles.settingDivider]}>
           <View style={{ flex: 1, gap: 2 }}>
@@ -600,6 +624,17 @@ const styles = StyleSheet.create({
   },
   settingDivider: { borderTopColor: colors.borderFaint, borderTopWidth: StyleSheet.hairlineWidth },
   settingTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.pill,
+    padding: 3,
+    gap: 2,
+  },
+  segmentItem: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill },
+  segmentItemActive: { backgroundColor: colors.accent },
+  segmentText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
+  segmentTextActive: { color: '#fff' },
   settingValue: { color: 'rgba(242,245,250,0.5)', fontSize: 13 },
   signOut: {
     backgroundColor: 'rgba(251,113,133,0.08)',
