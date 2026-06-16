@@ -228,6 +228,15 @@ export function BackButton({ onPress }: { onPress: () => void }) {
   );
 }
 
+/** Same chrome as BackButton but an ✕ — used to dismiss a detail pane/sidebar. */
+export function CloseButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.backButton} onPress={onPress}>
+      <Text style={styles.closeGlyph}>✕</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
@@ -298,4 +307,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backChevron: { color: colors.textMid, fontSize: 24, fontWeight: '600', marginTop: -3 },
+  closeGlyph: { color: colors.textMid, fontSize: 15, fontWeight: '700' },
 });

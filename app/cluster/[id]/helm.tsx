@@ -12,16 +12,15 @@ import {
 import { HelmRelease, listHelmReleases } from '../../../src/kube/helm';
 import { namespaceLabel, useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
+import { useDetailSelection } from '../../../src/state/DetailSelection';
 import { BackButton, Card, Pill, SquircleIcon } from '../../../src/ui/kit';
+import { helmStatusColor } from '../../../src/ui/helmStatus';
 import { NamespaceSheet } from '../../../src/ui/sheets';
 import { Button, EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
+import { useResponsiveLayout } from '../../../src/ui/useResponsiveLayout';
 import { colors, spacing } from '../../../src/ui/theme';
 
-export function helmStatusColor(status: string): string {
-  if (status === 'deployed') return colors.success;
-  if (status === 'failed' || status === 'unknown') return colors.danger;
-  return colors.warning;
-}
+export { helmStatusColor };
 
 export default function HelmReleasesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,6 +28,8 @@ export default function HelmReleasesScreen() {
   const { getById } = useClusters();
   const cluster = getById(id);
   const { namespace } = useClusterScope();
+  const { isWide } = useResponsiveLayout();
+  const detail = useDetailSelection();
 
   const [releases, setReleases] = useState<HelmRelease[]>([]);
   const [filter, setFilter] = useState('');
@@ -55,6 +56,12 @@ export default function HelmReleasesScreen() {
     void load();
   }, [load]);
 
+  // A namespace change invalidates the detail selection; so does leaving.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => detail.close(), [namespace]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => detail.close(), []);
+
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase();
     if (!query) return releases;
@@ -66,6 +73,78 @@ export default function HelmReleasesScreen() {
   }, [releases, filter]);
 
   if (!cluster) return <EmptyState message="Cluster not found." />;
+
+  const openRelease = (item: HelmRelease) => {
+    router.push({
+      pathname: '/cluster/[id]/helm-release',
+      params: {
+        id,
+        namespace: item.namespace,
+        name: item.name,
+        revision: String(item.revision),
+        secretName: item.secretName,
+      },
+    });
+  };
+
+  const handlePress = (item: HelmRelease) => {
+    if (isWide) {
+      detail.open({
+        kind: 'helm-release',
+        namespace: item.namespace,
+        name: item.name,
+        revision: String(item.revision),
+        secretName: item.secretName,
+      });
+    } else {
+      openRelease(item);
+    }
+  };
+
+  const root = detail.stack[0];
+  const isSelected = (item: HelmRelease) =>
+    isWide &&
+    root?.kind === 'helm-release' &&
+    root.namespace === item.namespace &&
+    root.name === item.name;
+
+  const listView = (
+    <FlatList
+      data={visible}
+      keyExtractor={(release) => `${release.namespace}/${release.name}`}
+      contentContainerStyle={styles.listContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load();
+          }}
+          tintColor={colors.accent}
+        />
+      }
+      ListEmptyComponent={<EmptyState message="No Helm releases found." />}
+      renderItem={({ item }) => (
+        <TouchableOpacity onPress={() => handlePress(item)}>
+          <Card style={styles.row} borderColor={isSelected(item) ? 'rgba(91,124,255,0.55)' : undefined}>
+            <SquircleIcon abbr="He" color="#36B3F4" />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.rowName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={styles.rowSub} numberOfLines={1}>
+                {item.namespace} · revision {item.revision}
+              </Text>
+            </View>
+            <Text style={[styles.status, { color: helmStatusColor(item.status) }]}>
+              {item.status}
+            </Text>
+            <Text style={styles.chevron}>›</Text>
+          </Card>
+        </TouchableOpacity>
+      )}
+    />
+  );
 
   return (
     <View style={styles.container}>
@@ -95,54 +174,7 @@ export default function HelmReleasesScreen() {
       ) : loading ? (
         <Loading />
       ) : (
-        <FlatList
-          data={visible}
-          keyExtractor={(release) => `${release.namespace}/${release.name}`}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                void load();
-              }}
-              tintColor={colors.accent}
-            />
-          }
-          ListEmptyComponent={<EmptyState message="No Helm releases found." />}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/cluster/[id]/helm-release',
-                  params: {
-                    id,
-                    namespace: item.namespace,
-                    name: item.name,
-                    revision: String(item.revision),
-                    secretName: item.secretName,
-                  },
-                })
-              }
-            >
-              <Card style={styles.row}>
-                <SquircleIcon abbr="He" color="#36B3F4" />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.rowName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>
-                    {item.namespace} · revision {item.revision}
-                  </Text>
-                </View>
-                <Text style={[styles.status, { color: helmStatusColor(item.status) }]}>
-                  {item.status}
-                </Text>
-                <Text style={styles.chevron}>›</Text>
-              </Card>
-            </TouchableOpacity>
-          )}
-        />
+        listView
       )}
 
       <NamespaceSheet visible={nsOpen} onClose={() => setNsOpen(false)} cluster={cluster} />

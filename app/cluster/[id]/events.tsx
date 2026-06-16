@@ -12,6 +12,7 @@ import { useClusterScope } from '../../../src/state/ClusterScope';
 import { useClusters } from '../../../src/state/ClustersContext';
 import { Card, Pill, StatusDot } from '../../../src/ui/kit';
 import { EmptyState, ErrorBox, Loading } from '../../../src/ui/components';
+import { useResponsiveLayout } from '../../../src/ui/useResponsiveLayout';
 import { colors, spacing } from '../../../src/ui/theme';
 import { ageOf } from '../../../src/util/format';
 
@@ -23,6 +24,7 @@ export default function EventsScreen() {
   const { getById } = useClusters();
   const cluster = getById(id);
   const { namespace } = useClusterScope();
+  const { isWide } = useResponsiveLayout();
 
   const [events, setEvents] = useState<ClusterEvent[] | null>(null);
   const [filter, setFilter] = useState<Filter>('All');
@@ -82,7 +84,7 @@ export default function EventsScreen() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isWide && styles.scrollWide]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -146,6 +148,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.6 },
   chips: { flexDirection: 'row', gap: 7, paddingBottom: 10 },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: 130 },
+  scrollWide: { paddingBottom: 28 },
   row: { flexDirection: 'row', gap: 11, paddingVertical: 13, alignItems: 'flex-start' },
   head: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   reason: { color: colors.text, fontSize: 13.5, fontWeight: '600' },
