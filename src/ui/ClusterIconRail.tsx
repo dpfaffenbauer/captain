@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from './rn';
+import { RawText as Text, ScrollView, StyleSheet, TouchableOpacity, View } from './rn';
 import { useClusterSwitch } from '../state/ClusterSwitch';
 import { ConnectionState, useClusterStatus } from '../state/ClusterStatusContext';
 import { useClusters } from '../state/ClustersContext';
