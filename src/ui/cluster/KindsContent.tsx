@@ -94,7 +94,7 @@ export function KindsContent({
 
       {error ? (
         <View style={{ padding: spacing.lg }}>
-          <ErrorBox message={error} />
+          <ErrorBox message={error} onRetry={() => void load()} />
         </View>
       ) : loading ? (
         <Loading />

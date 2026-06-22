@@ -16,7 +16,7 @@ import { useDetailSelection } from '../../state/DetailSelection';
 import { BackButton, Card, Pill, SquircleIcon } from '../kit';
 import { helmStatusColor } from '../helmStatus';
 import { NamespaceSheet } from '../sheets';
-import { Button, EmptyState, ErrorBox, Loading } from '../components';
+import { EmptyState, ErrorBox, Loading } from '../components';
 import { useResponsiveLayout } from '../useResponsiveLayout';
 import { colors, spacing } from '../theme';
 
@@ -149,8 +149,7 @@ export function HelmContent({ clusterId }: { clusterId: string }) {
 
       {error ? (
         <View style={{ padding: spacing.lg }}>
-          <ErrorBox message={error} />
-          <Button title="Retry" variant="secondary" onPress={() => void load()} />
+          <ErrorBox message={error} onRetry={() => void load()} />
         </View>
       ) : loading ? (
         <Loading />

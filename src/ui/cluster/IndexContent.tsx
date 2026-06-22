@@ -334,7 +334,13 @@ export function IndexContent({ clusterId }: { clusterId: string }) {
 
       {error ? (
         <View style={{ paddingHorizontal: spacing.lg }}>
-          <ErrorBox message={error} />
+          <ErrorBox
+            message={error}
+            onRetry={() => {
+              void load();
+              void reloadProm();
+            }}
+          />
         </View>
       ) : null}
 

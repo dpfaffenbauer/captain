@@ -14,7 +14,7 @@ import { useClusters } from '../../state/ClustersContext';
 import { useClusterNav } from '../../state/ClusterNav';
 import { hapticTap } from '../../util/haptics';
 import { BackButton, Card, SquircleIcon, StatusDot } from '../kit';
-import { Button, EmptyState, ErrorBox, Loading } from '../components';
+import { EmptyState, ErrorBox, Loading } from '../components';
 import { colors, radius, spacing } from '../theme';
 
 function syncColor(app: GitOpsApp): string {
@@ -120,8 +120,7 @@ export function GitopsContent({ clusterId }: { clusterId: string }) {
 
       {error ? (
         <View style={{ padding: spacing.lg }}>
-          <ErrorBox message={error} />
-          <Button title="Retry" variant="secondary" onPress={() => void load()} />
+          <ErrorBox message={error} onRetry={() => void load()} />
         </View>
       ) : loading ? (
         <Loading />
