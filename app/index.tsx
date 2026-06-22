@@ -7,7 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../src/ui/rn';
 import { publishWidgetSnapshot, WidgetClusterEntry } from '../modules/captain-widget';
 import { abbreviationFor } from '../src/kube/categories';
 import { ClusterHealth, getClusterHealth, healthTone } from '../src/kube/health';

@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from './rn';
 import { getResource, listEventsFor, ResourceEvent } from '../kube/client';
 import { summarizeResource } from '../kube/summarize';
 import { ApiResourceType, ClusterConfig } from '../types';

@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
-} from 'react-native';
+} from './rn';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { cardGradient, colors, radius, spacing } from './theme';
 

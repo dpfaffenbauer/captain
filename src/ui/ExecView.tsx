@@ -8,7 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from './rn';
 import { execCommand, ShellSession, startShellSession } from '../kube/exec';
 import { ClusterConfig } from '../types';
 import { BackButton, CloseButton, Pill } from './kit';

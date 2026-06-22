@@ -8,7 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../src/ui/rn';
 import { ImportedContext, parseKubeconfig } from '../src/kube/kubeconfig';
 import { useClusters } from '../src/state/ClustersContext';
 import { Button, ErrorBox, Field } from '../src/ui/components';

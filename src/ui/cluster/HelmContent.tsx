@@ -7,7 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../rn';
 import { HelmRelease, listHelmReleases } from '../../kube/helm';
 import { namespaceLabel, useClusterScope } from '../../state/ClusterScope';
 import { useClusterNav } from '../../state/ClusterNav';

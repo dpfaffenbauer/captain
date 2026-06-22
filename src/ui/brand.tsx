@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from './rn';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { AuthType } from '../types';
 import { colors, radius, spacing } from './theme';

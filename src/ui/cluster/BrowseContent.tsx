@@ -5,7 +5,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../rn';
 import { abbreviationFor, categorizeResourceTypes } from '../../kube/categories';
 import { discoverResourceTypes } from '../../kube/client';
 import { getForwards, subscribeForwards } from '../../kube/portforward';

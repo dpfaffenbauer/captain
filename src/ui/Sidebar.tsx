@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from './rn';
 import { abbreviationFor, categorizeResourceTypes, ResourceCategory } from '../kube/categories';
 import { discoverResourceTypesCached } from '../kube/client';
 import { useAccessibleResourceTypes } from '../state/AccessContext';
