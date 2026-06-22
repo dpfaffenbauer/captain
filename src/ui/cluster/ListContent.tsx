@@ -21,6 +21,7 @@ import {
   ResourceUsage,
 } from '../../kube/metrics';
 import { parseCpu, parseMemory } from '../../kube/quantity';
+import { useAccess } from '../../state/AccessContext';
 import { namespaceLabel, useClusterScope } from '../../state/ClusterScope';
 import { useClusterNav } from '../../state/ClusterNav';
 import { useClusters } from '../../state/ClustersContext';
@@ -94,6 +95,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
   const { getById } = useClusters();
   const cluster = getById(clusterId);
   const { namespace } = useClusterScope();
+  const { checkAccess } = useAccess();
   const detail = useDetailSelection();
   const nav = useClusterNav();
 
@@ -103,6 +105,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [denied, setDenied] = useState(false);
   const [nsOpen, setNsOpen] = useState(false);
   const [usage, setUsage] = useState<Map<string, ResourceUsage> | null>(null);
   const [live, setLive] = useState(false);
@@ -131,9 +134,26 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
     async (reset: boolean, token?: string) => {
       if (!cluster) return;
       setError('');
+      const scopeNamespace = type.namespaced && namespace !== '' ? namespace : undefined;
       try {
+        // Ask the API server whether we may list this kind in this scope before
+        // trying — turns a hard "forbidden" into a clear, actionable message.
+        const allowed = await checkAccess({
+          verb: 'list',
+          group: type.group,
+          resource: type.plural,
+          namespace: scopeNamespace,
+        });
+        if (!allowed) {
+          stopWatch();
+          setDenied(true);
+          setItems([]);
+          setContinueToken(undefined);
+          return;
+        }
+        setDenied(false);
         const result = await listResources(cluster, type, {
-          namespace: type.namespaced && namespace !== '' ? namespace : undefined,
+          namespace: scopeNamespace,
           continueToken: token,
         });
         let next = reset ? result.items : [...items, ...result.items];
@@ -157,7 +177,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cluster, type, namespace]
+    [cluster, type, namespace, checkAccess]
   );
 
   /** Keeps the list in sync via the watch API (only with the native build). */
@@ -687,7 +707,17 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
         ) : null}
       </View>
 
-      {error ? (
+      {denied ? (
+        <EmptyState
+          message={`You don't have permission to list ${type.kind}s${
+            type.namespaced && namespace !== ''
+              ? ` in ${namespace}`
+              : type.namespaced
+                ? ' across all namespaces'
+                : ''
+          }.${type.namespaced ? ' Try switching namespace above.' : ''}`}
+        />
+      ) : error ? (
         <View style={{ padding: spacing.lg }}>
           <ErrorBox message={error} />
           <Button title="Retry" variant="secondary" onPress={() => void load(true)} />

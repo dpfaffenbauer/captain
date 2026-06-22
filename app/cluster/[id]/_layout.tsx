@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { RouterClusterNavProvider } from '../../../src/state/ClusterNav';
 import { ClusterScopeProvider } from '../../../src/state/ClusterScope';
+import { AccessProvider } from '../../../src/state/AccessContext';
 import { useClusterSession } from '../../../src/state/ClusterSession';
 import { RouterClusterSwitchProvider } from '../../../src/state/ClusterSwitch';
 import { DetailSelectionProvider } from '../../../src/state/DetailSelection';
@@ -57,10 +58,11 @@ export default function ClusterLayout() {
   // Phone: one cluster at a time, driven by the router.
   return (
     <ClusterScopeProvider clusterId={id}>
-      <SidePaneProvider>
-        <DetailSelectionProvider>
-          <DockProvider>
-            <RouterClusterSwitchProvider activeId={id}>
+      <AccessProvider clusterId={id}>
+        <SidePaneProvider>
+          <DetailSelectionProvider>
+            <DockProvider>
+              <RouterClusterSwitchProvider activeId={id}>
               <RouterClusterNavProvider clusterId={id}>
                 <View style={{ flex: 1 }}>
                   <Stack
@@ -84,7 +86,8 @@ export default function ClusterLayout() {
             </RouterClusterSwitchProvider>
           </DockProvider>
         </DetailSelectionProvider>
-      </SidePaneProvider>
+        </SidePaneProvider>
+      </AccessProvider>
     </ClusterScopeProvider>
   );
 }

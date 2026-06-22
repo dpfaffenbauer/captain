@@ -41,6 +41,7 @@ import {
 import { KubeApiError } from '../kube/transport';
 import { DiffLine, diffLines } from '../util/diff';
 import { summarizeResource, SummarySection } from '../kube/summarize';
+import { useAccess } from '../state/AccessContext';
 import { useFavorites } from '../state/FavoritesContext';
 import { favoriteKey } from '../storage/favorites';
 import { hapticTap, hapticWarning } from '../util/haptics';
@@ -146,6 +147,7 @@ export function ItemView({
   onShowForwards,
 }: ItemViewProps) {
   const { isFavorite, toggle: toggleFavorite } = useFavorites();
+  const { can } = useAccess();
 
   const typeKey = `${type.group}/${type.kind}`;
   const isPod = typeKey === '/Pod';
@@ -226,8 +228,9 @@ export function ItemView({
     void load();
   }, [load]);
 
-  const canEdit = type.verbs.length === 0 || type.verbs.includes('update');
-  const canDelete = type.verbs.length === 0 || type.verbs.includes('delete');
+  // Discovery says the kind supports the verb; RBAC says this user may use it.
+  const canEdit = (type.verbs.length === 0 || type.verbs.includes('update')) && can('update', type);
+  const canDelete = (type.verbs.length === 0 || type.verbs.includes('delete')) && can('delete', type);
 
   const phase = (manifest as any)?.status?.phase as string | undefined;
   const statusPill = isPod
