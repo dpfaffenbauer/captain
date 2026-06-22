@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './Text';
 import { abbreviationFor, categorizeResourceTypes, ResourceCategory } from '../kube/categories';
 import { discoverResourceTypesCached } from '../kube/client';
 import { MasterView, useClusterNav } from '../state/ClusterNav';

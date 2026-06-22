@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from './Text';
 import { getPodLogs, streamPodLogs } from '../kube/client';
 import { isStreamingAvailable, KubeStreamHandle } from '../kube/stream';
 import { ClusterConfig } from '../types';

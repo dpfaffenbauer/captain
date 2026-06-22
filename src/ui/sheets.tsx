@@ -1,17 +1,20 @@
-import { useRouter } from 'expo-router';
+import {
+  useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useEffect, useState } from 'react';
+import React,
+  { useEffect,
+  useState } from 'react';
 import {
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from './Text';
 import { listNamespaces } from '../kube/client';
 import { PromAlert } from '../kube/prometheus';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';

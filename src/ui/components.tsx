@@ -2,12 +2,11 @@ import React from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
-  TextInput,
   TextInputProps,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from './Text';
 import { colors, spacing } from './theme';
 
 export function Field({

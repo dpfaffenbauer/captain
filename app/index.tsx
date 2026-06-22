@@ -1,13 +1,18 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import {
+  useFocusEffect,
+  useRouter } from 'expo-router';
+import React,
+  { useCallback,
+  useEffect,
+  useState } from 'react';
 import {
   Alert,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../src/ui/Text';
 import { publishWidgetSnapshot, WidgetClusterEntry } from '../modules/captain-widget';
 import { abbreviationFor } from '../src/kube/categories';
 import { ClusterHealth, getClusterHealth, healthTone } from '../src/kube/health';

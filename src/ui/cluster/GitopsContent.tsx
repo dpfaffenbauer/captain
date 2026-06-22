@@ -4,11 +4,10 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from '../Text';
 import { GitOpsApp, listGitOpsApps, triggerSync } from '../../kube/gitops';
 import { useClusters } from '../../state/ClustersContext';
 import { useClusterNav } from '../../state/ClusterNav';

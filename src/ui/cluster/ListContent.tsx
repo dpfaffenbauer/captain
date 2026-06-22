@@ -4,12 +4,11 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
   ViewStyle,
 } from 'react-native';
+import { Text, TextInput } from '../Text';
 import { listResources, restartRollout, scaleResource } from '../../kube/client';
 import { KubeStreamHandle } from '../../kube/stream';
 import { isWatchAvailable, watchResources } from '../../kube/watch';

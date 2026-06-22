@@ -4,11 +4,10 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from './Text';
 import { execCommand, ShellSession, startShellSession } from '../kube/exec';
 import { ClusterConfig } from '../types';
 import { BackButton, CloseButton, Pill } from './kit';

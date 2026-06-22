@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'r
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../Text';
 import {
   abbreviationFor,
   categorizeResourceTypes,

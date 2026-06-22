@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '../Text';
 import { abbreviationFor, categorizeResourceTypes } from '../../kube/categories';
 import { discoverResourceTypesCached } from '../../kube/client';
 import { useClusterNav } from '../../state/ClusterNav';

@@ -1,14 +1,16 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import {
+  useRouter } from 'expo-router';
+import React,
+  { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../src/ui/Text';
 import { ImportedContext, parseKubeconfig } from '../src/kube/kubeconfig';
 import { useClusters } from '../src/state/ClustersContext';
 import { Button, ErrorBox, Field } from '../src/ui/components';

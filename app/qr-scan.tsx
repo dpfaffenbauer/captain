@@ -1,7 +1,15 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import {
+  CameraView,
+  useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import React,
+  { useRef,
+  useState } from 'react';
+import { Alert,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { Text } from '../src/ui/Text';
 import { parseKubeconfig } from '../src/kube/kubeconfig';
 import { useClusters } from '../src/state/ClustersContext';
 import { Button, EmptyState } from '../src/ui/components';

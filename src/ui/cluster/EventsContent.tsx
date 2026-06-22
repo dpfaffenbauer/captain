@@ -3,9 +3,9 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../Text';
 import { ClusterEvent, listClusterEvents } from '../../kube/client';
 import { useClusterScope } from '../../state/ClusterScope';
 import { useClusters } from '../../state/ClustersContext';

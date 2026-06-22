@@ -7,9 +7,9 @@ const KEY = 'captain.ui-scale';
 /** Selectable interface sizes. macOS/large displays make iPad points feel tiny. */
 export const UI_SCALE_OPTIONS = [
   { label: 'Default', value: 1 },
-  { label: 'Large', value: 1.25 },
-  { label: 'Larger', value: 1.5 },
-  { label: 'Largest', value: 1.8 },
+  { label: 'Large', value: 1.2 },
+  { label: 'Larger', value: 1.4 },
+  { label: 'Largest', value: 1.6 },
 ] as const;
 
 /**
@@ -29,7 +29,7 @@ function isDesktop(): boolean {
 
 /** macOS displays render iPad points small, so default to a comfortably larger zoom. */
 function defaultScale(): number {
-  return isDesktop() ? 1.5 : 1;
+  return isDesktop() ? 1.4 : 1;
 }
 
 interface UiScaleValue {
@@ -64,4 +64,12 @@ export function useUiScale(): UiScaleValue {
   const context = useContext(UiScaleContext);
   if (!context) throw new Error('useUiScale must be used within a UiScaleProvider');
   return context;
+}
+
+/**
+ * Non-throwing scale read for the scaled Text/TextInput. Defaults to 1 when no
+ * provider is mounted, so text never crashes if rendered outside the tree.
+ */
+export function useScaleFactor(): number {
+  return useContext(UiScaleContext)?.scale ?? 1;
 }

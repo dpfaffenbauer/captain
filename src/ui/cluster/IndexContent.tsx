@@ -3,10 +3,10 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../Text';
 import {
   ClusterEvent,
   getServerVersion,

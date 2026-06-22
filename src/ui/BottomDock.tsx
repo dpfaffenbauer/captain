@@ -3,11 +3,11 @@ import {
   PanResponder,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from './Text';
 import { useClusters } from '../state/ClustersContext';
 import { useDock } from '../state/DockContext';
 import { ExecView } from './ExecView';

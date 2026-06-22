@@ -6,10 +6,10 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from './Text';
 import {
   applyResource,
   deleteResource,

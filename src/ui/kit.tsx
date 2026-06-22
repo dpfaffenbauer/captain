@@ -1,13 +1,14 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   Modal,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   ViewStyle,
 } from 'react-native';
+import { Text } from './Text';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { cardGradient, colors, radius, spacing } from './theme';
 

@@ -1,6 +1,12 @@
-import { useRouter } from 'expo-router';
+import {
+  useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Text } from './Text';
 import { useClusterSwitch } from '../state/ClusterSwitch';
 import { ConnectionState, useClusterStatus } from '../state/ClusterStatusContext';
 import { useClusters } from '../state/ClustersContext';

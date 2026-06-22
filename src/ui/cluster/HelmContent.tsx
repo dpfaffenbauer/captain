@@ -3,11 +3,10 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from '../Text';
 import { HelmRelease, listHelmReleases } from '../../kube/helm';
 import { namespaceLabel, useClusterScope } from '../../state/ClusterScope';
 import { useClusterNav } from '../../state/ClusterNav';

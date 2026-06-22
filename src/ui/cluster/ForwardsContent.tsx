@@ -1,5 +1,6 @@
 import React, { useSyncExternalStore } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import {
   getForwards,
   stopPortForward,

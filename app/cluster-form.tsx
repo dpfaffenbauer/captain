@@ -1,15 +1,19 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import {
+  useLocalSearchParams,
+  useRouter } from 'expo-router';
+import React,
+  { useMemo,
+  useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../src/ui/Text';
 import {
   azureRedirectUri,
   azureSignIn,

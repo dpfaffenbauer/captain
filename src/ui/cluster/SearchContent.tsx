@@ -2,11 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from '../Text';
 import { listResources } from '../../kube/client';
 import { useClusters } from '../../state/ClustersContext';
 import { useClusterNav } from '../../state/ClusterNav';
