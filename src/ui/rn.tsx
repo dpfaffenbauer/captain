@@ -51,3 +51,11 @@ export function Text(props: React.ComponentProps<typeof RNText>) {
 export function TextInput(props: React.ComponentProps<typeof RNTextInput>) {
   return <RNTextInput {...props} style={scaleStyle(props.style)} />;
 }
+
+/**
+ * The unscaled React Native `Text`, for fixed-size chrome (icon rails, avatars,
+ * badges) whose glyphs must track their fixed container rather than the global
+ * interface zoom — otherwise the text outgrows its box.
+ */
+export const RawText = RNText;
+
