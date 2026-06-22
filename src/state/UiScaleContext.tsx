@@ -1,20 +1,35 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 
 const KEY = 'captain.ui-scale';
 
 /** Selectable interface sizes. macOS/large displays make iPad points feel tiny. */
 export const UI_SCALE_OPTIONS = [
   { label: 'Default', value: 1 },
-  { label: 'Large', value: 1.15 },
-  { label: 'Larger', value: 1.3 },
+  { label: 'Large', value: 1.25 },
+  { label: 'Larger', value: 1.5 },
+  { label: 'Largest', value: 1.8 },
 ] as const;
 
-/** Mac Catalyst reports this idiom; default it a notch larger out of the box. */
-function defaultScale(): number {
+/**
+ * Decide whether we are rendering on a Mac, where iPad point sizes look tiny.
+ * Mac Catalyst reports the `mac` idiom directly. Apps shipped as "Designed for
+ * iPad" run on Apple Silicon Macs while still reporting the `pad` idiom, so we
+ * fall back to a screen-width check: no iPad is wider than 1366pt, so anything
+ * past that on iOS is a Mac display.
+ */
+function isDesktop(): boolean {
   const idiom = (Platform.constants as { interfaceIdiom?: string } | undefined)?.interfaceIdiom;
-  return idiom === 'mac' ? 1.15 : 1;
+  if (idiom === 'mac') return true;
+  if (Platform.OS !== 'ios') return false;
+  const { width, height } = Dimensions.get('screen');
+  return Math.max(width, height) > 1400;
+}
+
+/** macOS displays render iPad points small, so default to a comfortably larger zoom. */
+function defaultScale(): number {
+  return isDesktop() ? 1.5 : 1;
 }
 
 interface UiScaleValue {
