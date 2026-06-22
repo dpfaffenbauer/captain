@@ -51,6 +51,7 @@ export default function ClusterFormScreen() {
   const [clientKeyData, setClientKeyData] = useState(existing?.clientKeyData ?? '');
   const [clientP12, setClientP12] = useState(existing?.clientP12 ?? '');
   const [clientP12Password, setClientP12Password] = useState(existing?.clientP12Password ?? '');
+  const [defaultNamespace, setDefaultNamespace] = useState(existing?.defaultNamespace ?? '');
 
   const [authType, setAuthType] = useState<AuthType>(existing?.auth.type ?? 'token');
   const [token, setToken] = useState(existing?.auth.type === 'token' ? existing.auth.token : '');
@@ -95,6 +96,7 @@ export default function ClusterFormScreen() {
       clientKeyData: clientKeyData.trim() || undefined,
       clientP12: clientP12.trim() || undefined,
       clientP12Password: clientP12Password || undefined,
+      defaultNamespace: defaultNamespace.trim() || undefined,
     };
     switch (authType) {
       case 'token':
@@ -262,6 +264,16 @@ export default function ClusterFormScreen() {
           <View style={[styles.checkbox, insecure && styles.checkboxChecked]} />
           <Text style={styles.toggleLabel}>Skip TLS verification (insecure)</Text>
         </TouchableOpacity>
+
+        <Field
+          label="Default namespace (optional)"
+          value={defaultNamespace}
+          onChangeText={setDefaultNamespace}
+          placeholder="Leave empty for all namespaces"
+        />
+        <Text style={styles.hint}>
+          Set this when the credentials are limited to one namespace and can&apos;t list cluster-wide.
+        </Text>
 
         <Text style={styles.sectionTitle}>Sign in with</Text>
         <View style={styles.providerGrid}>

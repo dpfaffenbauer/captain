@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -248,26 +249,75 @@ export function NamespaceSheet({
 }) {
   const { namespace, setNamespace } = useClusterScope();
   const [names, setNames] = useState<string[]>([]);
+  const [listError, setListError] = useState(false);
+  const [manual, setManual] = useState('');
 
   useEffect(() => {
     if (!visible) return;
+    setListError(false);
+    setManual('');
     listNamespaces(cluster)
-      .then(setNames)
-      .catch(() => setNames([]));
+      .then((result) => {
+        setNames(result);
+        setListError(false);
+      })
+      .catch(() => {
+        // Listing namespaces needs cluster-scope access; restricted credentials
+        // can't, so fall back to manual entry instead of an empty picker.
+        setNames([]);
+        setListError(true);
+      });
   }, [visible, cluster]);
+
+  const apply = (name: string) => {
+    setNamespace(name);
+    onClose();
+  };
+
+  // Always offer the current scope and the cluster's default namespace, even
+  // when the namespace list itself is forbidden.
+  const known = Array.from(
+    new Set(['', cluster.defaultNamespace ?? '', namespace, ...names].filter((n) => n !== undefined))
+  );
+  const trimmedManual = manual.trim();
+  const canApplyManual = trimmedManual.length > 0 && !known.includes(trimmedManual);
 
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Namespaces">
+      {listError ? (
+        <Text style={styles.nsHint}>
+          Can&apos;t list namespaces with these permissions. Enter the namespace you have access to.
+        </Text>
+      ) : null}
+      <View style={styles.nsEntryRow}>
+        <TextInput
+          style={styles.nsInput}
+          value={manual}
+          onChangeText={setManual}
+          placeholder="Enter a namespace"
+          placeholderTextColor={colors.textFaint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onSubmitEditing={() => {
+            if (canApplyManual) apply(trimmedManual);
+          }}
+          returnKeyType="go"
+        />
+        <TouchableOpacity
+          style={[styles.nsApply, !canApplyManual && styles.nsApplyDisabled]}
+          disabled={!canApplyManual}
+          onPress={() => apply(trimmedManual)}
+        >
+          <Text style={styles.nsApplyText}>Use</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 10 }}>
-        {['', ...names].map((name) => (
+        {known.map((name) => (
           <SheetRow
             key={name || '*'}
             title={namespaceLabel(name)}
             active={namespace === name}
-            onPress={() => {
-              setNamespace(name);
-              onClose();
-            }}
+            onPress={() => apply(name)}
           />
         ))}
       </ScrollView>
@@ -581,6 +631,27 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
   rowSub: { color: colors.textDim, fontSize: 11.5 },
   check: { color: colors.link, fontSize: 13, fontWeight: '700' },
+  nsHint: { color: colors.warning, fontSize: 12.5, lineHeight: 18, marginBottom: 10 },
+  nsEntryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  nsInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    color: colors.text,
+    fontSize: 14,
+  },
+  nsApply: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.card,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+  },
+  nsApplyDisabled: { opacity: 0.4 },
+  nsApplyText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   addRow: {
     borderWidth: 1,
     borderStyle: 'dashed',
