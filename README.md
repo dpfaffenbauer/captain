@@ -119,7 +119,7 @@ Events), and bottom sheets for cluster and namespace selection.
 - **QR onboarding**: scan a kubeconfig as a QR code
   (`kubectl config view --minify --raw | qrencode -t png`).
 - **Settings sheet**: default namespace, haptics toggle (real tap feedback
-  on destructive actions), edit clusters, sign out of all clusters.
+  on destructive actions), edit clusters.
 
 ## Project structure
 

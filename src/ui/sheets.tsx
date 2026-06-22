@@ -32,7 +32,7 @@ import {
   setAppLockEnabled,
 } from '../util/applock';
 import { ageOf } from '../util/format';
-import { hapticWarning, loadHapticsSetting, setHapticsEnabled } from '../util/haptics';
+import { loadHapticsSetting, setHapticsEnabled } from '../util/haptics';
 import { BottomSheet, StatusDot } from './kit';
 import { colors, radius } from './theme';
 
@@ -337,7 +337,6 @@ export function SettingsSheet({
   onOpenNamespaces: () => void;
 }) {
   const router = useRouter();
-  const { clusters, remove } = useClusters();
   const { namespace } = useClusterScope();
   const { scale, setScale } = useUiScale();
   const [haptics, setHaptics] = useState(true);
@@ -375,17 +374,6 @@ export function SettingsSheet({
     }
     setAppLock(true);
     void setAppLockEnabled(true);
-  };
-
-  const signOutAll = () => {
-    hapticWarning();
-    onClose();
-    void (async () => {
-      for (const entry of clusters) {
-        await remove(entry.id);
-      }
-      router.replace('/');
-    })();
   };
 
   return (
@@ -487,9 +475,6 @@ export function SettingsSheet({
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.signOut} onPress={signOutAll}>
-        <Text style={styles.signOutText}>Sign out of all clusters</Text>
-      </TouchableOpacity>
       <Text style={styles.version}>Captain 1.0.0</Text>
     </BottomSheet>
   );
@@ -707,15 +692,6 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   segmentTextActive: { color: '#fff' },
   settingValue: { color: 'rgba(242,245,250,0.5)', fontSize: 13 },
-  signOut: {
-    backgroundColor: 'rgba(251,113,133,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(251,113,133,0.2)',
-    borderRadius: radius.card,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  signOutText: { color: colors.dangerLight, fontSize: 14, fontWeight: '600' },
   version: { color: 'rgba(242,245,250,0.3)', fontSize: 11, textAlign: 'center' },
   alertMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   severityPill: {
