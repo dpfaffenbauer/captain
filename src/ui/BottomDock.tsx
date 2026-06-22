@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from './rn';
 import { useClusters } from '../state/ClustersContext';
 import { useDock } from '../state/DockContext';
 import { ExecView } from './ExecView';

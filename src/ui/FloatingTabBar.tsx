@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
-import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from './rn';
 import { hapticTap } from '../util/haptics';
 import { TabIcon, TABS, TabKey } from './clusterTabs';
 import { colors, radius } from './theme';

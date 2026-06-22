@@ -9,7 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../src/ui/rn';
 import {
   azureRedirectUri,
   azureSignIn,

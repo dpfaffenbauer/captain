@@ -8,7 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from '../rn';
 import { GitOpsApp, listGitOpsApps, triggerSync } from '../../kube/gitops';
 import { useClusters } from '../../state/ClustersContext';
 import { useClusterNav } from '../../state/ClusterNav';

@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
-} from 'react-native';
+} from '../rn';
 import { listResources, restartRollout, scaleResource } from '../../kube/client';
 import { KubeStreamHandle } from '../../kube/stream';
 import { isWatchAvailable, watchResources } from '../../kube/watch';

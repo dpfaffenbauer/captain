@@ -7,7 +7,7 @@ import {
   TextInputProps,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from './rn';
 import { colors, spacing } from './theme';
 
 export function Field({

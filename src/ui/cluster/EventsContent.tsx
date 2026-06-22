@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
+} from '../rn';
 import { ClusterEvent, listClusterEvents } from '../../kube/client';
 import { useClusterScope } from '../../state/ClusterScope';
 import { useClusters } from '../../state/ClustersContext';

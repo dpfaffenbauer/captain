@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from './rn';
 import { listNamespaces } from '../kube/client';
 import { PromAlert } from '../kube/prometheus';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
