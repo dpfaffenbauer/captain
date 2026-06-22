@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useClusters } from './ClustersContext';
 import { useClusterSession } from './ClusterSession';
 
 /** Empty string = all namespaces. */
@@ -22,10 +23,16 @@ export function ClusterScopeProvider({
   const params = useLocalSearchParams<{ id: string }>();
   const id = clusterId ?? params.id;
   const session = useClusterSession();
+  const { getById } = useClusters();
   // Restore the namespace this cluster was last scoped to. The provider
   // remounts per cluster (the id route param changes), so this initialiser
-  // runs fresh for each cluster.
-  const [namespace, setNamespaceState] = useState(() => session.get(id)?.namespace ?? '');
+  // runs fresh for each cluster. With no remembered scope yet, fall back to the
+  // cluster's default namespace (from its kubeconfig context) — this keeps
+  // namespace-restricted credentials from opening on "all namespaces", which
+  // they cannot list at cluster scope.
+  const [namespace, setNamespaceState] = useState(
+    () => session.get(id)?.namespace ?? getById(id)?.defaultNamespace ?? ''
+  );
 
   const setNamespace = useCallback(
     (next: string) => {

@@ -76,6 +76,14 @@ export interface ClusterConfig {
   clientP12?: string;
   clientP12Password?: string;
   auth: AuthConfig;
+  /**
+   * Namespace this connection is scoped to by default (the kubeconfig context's
+   * `namespace`). Important for namespace-restricted credentials that cannot
+   * list at cluster scope: Captain opens here instead of "all namespaces", so
+   * lists don't fail with a cluster-scope "forbidden" error. Empty/undefined
+   * means all namespaces.
+   */
+  defaultNamespace?: string;
   /** Resolved/auto-discovered Prometheus location for metrics and alerts. */
   prometheus?: PrometheusConfig;
 }

@@ -17,7 +17,10 @@ export interface ImportedContext {
 interface KubeconfigFile {
   clusters?: Array<{ name: string; cluster: Record<string, unknown> }>;
   users?: Array<{ name: string; user: Record<string, unknown> }>;
-  contexts?: Array<{ name: string; context: { cluster: string; user: string } }>;
+  contexts?: Array<{
+    name: string;
+    context: { cluster: string; user: string; namespace?: string };
+  }>;
 }
 
 function execArg(args: string[], flag: string): string | undefined {
@@ -143,6 +146,12 @@ export function parseKubeconfig(text: string): ImportedContext[] {
             : undefined,
         clientKeyData:
           typeof userDef['client-key-data'] === 'string' ? userDef['client-key-data'] : undefined,
+        // A context namespace usually signals namespace-restricted access; keep
+        // it so Captain opens scoped instead of trying to list cluster-wide.
+        defaultNamespace:
+          typeof entry.context.namespace === 'string' && entry.context.namespace.length > 0
+            ? entry.context.namespace
+            : undefined,
         auth,
       },
     });
