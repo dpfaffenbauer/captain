@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { abbreviationFor, categorizeResourceTypes } from '../../kube/categories';
 import { discoverResourceTypesCached } from '../../kube/client';
+import { useAccessibleResourceTypes } from '../../state/AccessContext';
 import { useClusterNav } from '../../state/ClusterNav';
 import { useClusters } from '../../state/ClustersContext';
 import { ApiResourceType } from '../../types';
@@ -54,14 +55,16 @@ export function KindsContent({
     void load();
   }, [load]);
 
+  // Narrow the category to kinds the current credentials may actually list.
+  const accessibleTypes = useAccessibleResourceTypes(types);
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase();
-    if (!query) return types;
-    return types.filter(
+    if (!query) return accessibleTypes;
+    return accessibleTypes.filter(
       (type) =>
         type.kind.toLowerCase().includes(query) || type.group.toLowerCase().includes(query)
     );
-  }, [types, filter]);
+  }, [accessibleTypes, filter]);
 
   if (!cluster) return <EmptyState message="Cluster not found." />;
 

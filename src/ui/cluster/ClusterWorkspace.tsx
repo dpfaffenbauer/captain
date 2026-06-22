@@ -6,6 +6,7 @@ import {
   MasterView,
 } from '../../state/ClusterNav';
 import { ClusterScopeProvider } from '../../state/ClusterScope';
+import { AccessProvider } from '../../state/AccessContext';
 import { DetailSelectionProvider, useDetailSelection } from '../../state/DetailSelection';
 import { DockProvider, useDock } from '../../state/DockContext';
 import { SidePaneProvider } from '../../state/SidePaneContext';
@@ -36,13 +37,15 @@ export function ClusterWorkspace({
       pointerEvents={visible ? 'auto' : 'none'}
     >
       <ClusterScopeProvider clusterId={clusterId}>
-        <SidePaneProvider>
-          <DetailSelectionProvider>
-            <DockProvider>
-              <WorkspaceInner clusterId={clusterId} />
-            </DockProvider>
-          </DetailSelectionProvider>
-        </SidePaneProvider>
+        <AccessProvider clusterId={clusterId}>
+          <SidePaneProvider>
+            <DetailSelectionProvider>
+              <DockProvider>
+                <WorkspaceInner clusterId={clusterId} />
+              </DockProvider>
+            </DetailSelectionProvider>
+          </SidePaneProvider>
+        </AccessProvider>
       </ClusterScopeProvider>
     </View>
   );

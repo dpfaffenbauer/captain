@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { abbreviationFor, categorizeResourceTypes, ResourceCategory } from '../kube/categories';
 import { discoverResourceTypesCached } from '../kube/client';
+import { useAccessibleResourceTypes } from '../state/AccessContext';
 import { MasterView, useClusterNav } from '../state/ClusterNav';
 import { namespaceLabel, useClusterScope } from '../state/ClusterScope';
 import { ConnectionState, useClusterStatus } from '../state/ClusterStatusContext';
@@ -46,7 +47,7 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
   const { namespace } = useClusterScope();
   const { favorites, remove: removeFavorite } = useFavorites();
 
-  const [categories, setCategories] = useState<ResourceCategory[]>([]);
+  const [types, setTypes] = useState<ApiResourceType[]>([]);
   const [hasGitOps, setHasGitOps] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -58,10 +59,10 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
   const load = useCallback(async () => {
     if (!cluster) return;
     try {
-      const types = await discoverResourceTypesCached(cluster);
-      setCategories(categorizeResourceTypes(types.filter((type) => type.verbs.includes('list'))));
+      const discovered = await discoverResourceTypesCached(cluster);
+      setTypes(discovered);
       setHasGitOps(
-        types.some(
+        discovered.some(
           (type) =>
             (type.group === 'argoproj.io' && type.kind === 'Application') ||
             type.group.endsWith('.toolkit.fluxcd.io')
@@ -75,6 +76,17 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Listable kinds, narrowed to what the current credentials may list (RBAC).
+  const listableTypes = useMemo(
+    () => types.filter((type) => type.verbs.includes('list')),
+    [types]
+  );
+  const accessibleTypes = useAccessibleResourceTypes(listableTypes);
+  const categories = useMemo(
+    () => categorizeResourceTypes(accessibleTypes),
+    [accessibleTypes]
+  );
 
   if (!cluster) return null;
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -6,13 +6,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  abbreviationFor,
-  categorizeResourceTypes,
-  ResourceCategory,
-} from '../../kube/categories';
+import { abbreviationFor, categorizeResourceTypes } from '../../kube/categories';
 import { discoverResourceTypes } from '../../kube/client';
 import { getForwards, subscribeForwards } from '../../kube/portforward';
+import { useAccessibleResourceTypes } from '../../state/AccessContext';
 import { namespaceLabel, useClusterScope } from '../../state/ClusterScope';
 import { useClusterNav } from '../../state/ClusterNav';
 import { useClusters } from '../../state/ClustersContext';
@@ -29,7 +26,7 @@ export function BrowseContent({ clusterId }: { clusterId: string }) {
   const cluster = getById(clusterId);
   const { namespace } = useClusterScope();
 
-  const [categories, setCategories] = useState<ResourceCategory[]>([]);
+  const [types, setTypes] = useState<ApiResourceType[]>([]);
   const [hasGitOps, setHasGitOps] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,10 +41,10 @@ export function BrowseContent({ clusterId }: { clusterId: string }) {
     if (!cluster) return;
     setError('');
     try {
-      const types = await discoverResourceTypes(cluster);
-      setCategories(categorizeResourceTypes(types.filter((type) => type.verbs.includes('list'))));
+      const discovered = await discoverResourceTypes(cluster);
+      setTypes(discovered);
       setHasGitOps(
-        types.some(
+        discovered.some(
           (type) =>
             (type.group === 'argoproj.io' && type.kind === 'Application') ||
             type.group.endsWith('.toolkit.fluxcd.io')
@@ -63,6 +60,18 @@ export function BrowseContent({ clusterId }: { clusterId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Only kinds the API supports listing, then narrowed to what the current
+  // credentials may actually list (RBAC), so restricted users see a clean tree.
+  const listableTypes = useMemo(
+    () => types.filter((type) => type.verbs.includes('list')),
+    [types]
+  );
+  const accessibleTypes = useAccessibleResourceTypes(listableTypes);
+  const categories = useMemo(
+    () => categorizeResourceTypes(accessibleTypes),
+    [accessibleTypes]
+  );
 
   const openType = (type: ApiResourceType) => {
     nav.show({ kind: 'list', type });
