@@ -78,7 +78,7 @@ export function EventsContent({ clusterId }: { clusterId: string }) {
 
       {error ? (
         <View style={{ padding: spacing.lg }}>
-          <ErrorBox message={error} />
+          <ErrorBox message={error} onRetry={() => void load()} />
         </View>
       ) : events === null ? (
         <Loading />

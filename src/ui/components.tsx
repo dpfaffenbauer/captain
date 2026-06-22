@@ -63,10 +63,23 @@ export function Button({
   );
 }
 
-export function ErrorBox({ message }: { message: string }) {
+export function ErrorBox({
+  message,
+  onRetry,
+}: {
+  message: string;
+  /** When set, renders a "Try again" affordance — vital after a transient
+   *  failure (e.g. VPN was down), so the only escape isn't navigating away. */
+  onRetry?: () => void;
+}) {
   return (
     <View style={styles.errorBox}>
       <Text style={styles.errorText}>{message}</Text>
+      {onRetry ? (
+        <TouchableOpacity style={styles.errorRetry} onPress={onRetry}>
+          <Text style={styles.errorRetryText}>Try again</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -149,6 +162,21 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#fca5a5',
     fontSize: 13,
+  },
+  errorRetry: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(252,165,165,0.12)',
+    borderColor: colors.danger,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  errorRetryText: {
+    color: '#fca5a5',
+    fontSize: 13,
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

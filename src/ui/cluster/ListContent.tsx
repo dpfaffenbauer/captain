@@ -719,8 +719,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
         />
       ) : error ? (
         <View style={{ padding: spacing.lg }}>
-          <ErrorBox message={error} />
-          <Button title="Retry" variant="secondary" onPress={() => void load(true)} />
+          <ErrorBox message={error} onRetry={() => void load(true)} />
         </View>
       ) : loading ? (
         <Loading />

@@ -16,7 +16,7 @@ import { useClusters } from '../../state/ClustersContext';
 import { ApiResourceType } from '../../types';
 import { Card, Pill, SquircleIcon } from '../kit';
 import { ClusterSwitcherButton, NamespaceSheet } from '../sheets';
-import { Button, EmptyState, ErrorBox, Loading } from '../components';
+import { EmptyState, ErrorBox, Loading } from '../components';
 import { useResponsiveLayout } from '../useResponsiveLayout';
 import { colors, radius, spacing } from '../theme';
 
@@ -99,8 +99,7 @@ export function BrowseContent({ clusterId }: { clusterId: string }) {
 
       {error ? (
         <View style={{ padding: spacing.lg }}>
-          <ErrorBox message={error} />
-          <Button title="Retry" variant="secondary" onPress={() => void load()} />
+          <ErrorBox message={error} onRetry={() => void load()} />
         </View>
       ) : loading ? (
         <Loading />
