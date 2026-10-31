@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datenschutz — Captain</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="index.html">Captain ⎈</a>
+    <a href="#en">English</a>
+  </header>
+
+  <section lang="de">
+    <h1>Datenschutzerklärung</h1>
+    <p class="meta">Stand: 31. Oktober 2026</p>
+    <p>Diese Erklärung gilt für die iOS-App „Captain“ und die Website kube-captain.com. Sie richtet sich nach der DSGVO und dem österreichischen Datenschutzgesetz (DSG).</p>
+
+    <h2>1. Verantwortlicher</h2>
+    <address>
+      Dominik Pfaffenbauer<br>
+      Zeileisstraße 6, 4600 Wels, Österreich<br>
+      E-Mail: <a href="mailto:amber@pfaffenbauer.at">amber@pfaffenbauer.at</a>
+    </address>
+
+    <h2>2. Überblick &amp; Grundsatz</h2>
+    <p>Captain ist ein Client zum Verwalten deiner Kubernetes-Cluster. Die App braucht kein Konto, und es gibt keinen eigenen Server. Wir bauen keine Analyse-, Tracking- oder Werbedienste ein und erhalten deine Clusterdaten und Zugangsdaten nicht. Daten werden nicht verkauft.</p>
+
+    <h2>3. Welche Daten die App verarbeitet</h2>
+    <p>Alle folgenden Daten bleiben auf deinem Gerät oder gehen nur an die Dienste aus Abschnitt 4:</p>
+    <ul>
+      <li><strong>Cluster-Verbindungen:</strong> Name, API-Server-Adresse und Zugangsdaten wie Tokens, Zertifikate, Schlüssel, AWS-Zugangsdaten und Anmeldetokens. Sie liegen im iOS-Schlüsselbund.</li>
+      <li><strong>Einstellungen:</strong> etwa Favoriten, Oberflächengröße und zuletzt gewählte Optionen, ebenfalls im Schlüsselbund.</li>
+      <li><strong>Cluster-Inhalte:</strong> Ressourcen, Logs, Ereignisse und Metriken, die die App direkt von deinem Cluster lädt, um sie anzuzeigen.</li>
+      <li><strong>Widget-Daten:</strong> eine Zusammenfassung des Cluster-Zustands, die im geschützten App-Bereich auf deinem Gerät liegt, damit das Widget sie anzeigen kann.</li>
+    </ul>
+
+    <h2>4. Verbindungen zu anderen Diensten</h2>
+    <p>Die App verbindet sich direkt von deinem Gerät mit den Diensten, die du selbst einrichtest. Für diese Dienste gelten deren Datenschutzbestimmungen, und du oder deine Organisation seid für sie verantwortlich.</p>
+    <ul>
+      <li><strong>Kubernetes-API-Server:</strong> die Cluster, die du hinzufügst, samt dort erreichbaren Diensten wie Prometheus.</li>
+      <li><strong>Google und Microsoft:</strong> wenn du dich für GKE oder AKS anmeldest.</li>
+      <li><strong>OIDC-Anbieter:</strong> der Anbieter, den du für die Anmeldung einträgst.</li>
+      <li><strong>AWS:</strong> Für EKS signiert die App Anfragen lokal auf deinem Gerät. Der Cluster prüft sie anschließend bei AWS.</li>
+    </ul>
+
+    <h2>5. Geräteberechtigungen</h2>
+    <ul>
+      <li><strong>Kamera:</strong> nur zum Scannen von Kubeconfig-QR-Codes. Bilder werden weder gespeichert noch übertragen.</li>
+      <li><strong>Face ID:</strong> optional, um die App zu sperren. Die Prüfung übernimmt iOS, die App erhält nur das Ergebnis.</li>
+      <li><strong>Mitteilungen:</strong> optional für Cluster-Warnungen. Die App prüft deine Cluster im Hintergrund und erzeugt die Mitteilungen lokal auf dem Gerät.</li>
+    </ul>
+
+    <h2>6. Apple</h2>
+    <p>Die App wird über den App Store von Apple vertrieben. Apple verarbeitet dabei Daten in eigener Verantwortung, etwa zu Downloads. Wenn du es in iOS erlaubst, stellt uns Apple zusammengefasste Nutzungsstatistiken und Absturzberichte bereit. Die Datenschutzrichtlinie von Apple findest du auf <a href="https://www.apple.com/legal/privacy/">apple.com/legal/privacy</a>.</p>
+
+    <h2>7. Website</h2>
+    <p>Die Website wird über GitHub Pages (GitHub, Inc., USA) bereitgestellt. Beim Aufruf verarbeitet GitHub technische Daten wie deine IP-Adresse, um die Seite auszuliefern und abzusichern. Dabei kann es zu einer Übermittlung in die USA kommen. Sie stützt sich auf einen Angemessenheitsbeschluss oder EU-Standardvertragsklauseln. Die Website verwendet keine Cookies und kein Tracking.</p>
+
+    <h2>8. Rechtsgrundlagen</h2>
+    <ul>
+      <li>Bereitstellung der App: Art. 6 Abs. 1 lit. b DSGVO.</li>
+      <li>Optionale Funktionen wie Kamera, Face ID und Mitteilungen: deine Einwilligung, Art. 6 Abs. 1 lit. a DSGVO.</li>
+      <li>Sicherer Betrieb der Website: berechtigtes Interesse, Art. 6 Abs. 1 lit. f DSGVO.</li>
+    </ul>
+
+    <h2>9. Speicherdauer</h2>
+    <p>Die Daten auf deinem Gerät bleiben gespeichert, bis du sie in der App entfernst. Entferne deine Cluster vor dem Löschen der App, denn iOS kann Einträge im Schlüsselbund auch danach aufbewahren. Für die Website-Protokolle gelten die Fristen von GitHub.</p>
+
+    <h2>10. Deine Rechte</h2>
+    <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch sowie darauf, eine Einwilligung mit Wirkung für die Zukunft zu widerrufen. Da deine App-Daten nur auf deinem Gerät liegen, kannst du sie dort selbst einsehen, ändern und löschen. Außerdem kannst du dich bei der österreichischen Datenschutzbehörde beschweren (<a href="https://www.dsb.gv.at">dsb.gv.at</a>).</p>
+
+    <h2>11. Datensicherheit</h2>
+    <p>Zugangsdaten liegen im iOS-Schlüsselbund. Verbindungen zu deinen Clustern laufen verschlüsselt über TLS, sofern du für einen Cluster nichts anderes einstellst, etwa eine unverschlüsselte Adresse oder eine deaktivierte Zertifikatsprüfung.</p>
+
+    <h2>12. Minderjährige</h2>
+    <p>Die App richtet sich nicht an Personen unter 16 Jahren.</p>
+
+    <h2>13. Änderungen dieser Erklärung</h2>
+    <p>Wir passen diese Erklärung an, wenn sich Funktionen oder die Rechtslage ändern. Es gilt jeweils die hier veröffentlichte Fassung.</p>
+
+    <h2>14. Kontakt</h2>
+    <p>Fragen zum Datenschutz beantworten wir unter <a href="mailto:amber@pfaffenbauer.at">amber@pfaffenbauer.at</a>.</p>
+  </section>
+
+  <section lang="en" id="en" class="lang">
+    <h1>Privacy Policy</h1>
+    <p class="meta">Last updated: October 31, 2026</p>
+    <p>This policy covers the iOS app "Captain" and the website kube-captain.com. It follows the GDPR and the Austrian Data Protection Act (DSG).</p>
+
+    <h2>1. Controller</h2>
+    <address>
+      Dominik Pfaffenbauer<br>
+      Zeileisstraße 6, 4600 Wels, Austria<br>
+      Email: <a href="mailto:amber@pfaffenbauer.at">amber@pfaffenbauer.at</a>
+    </address>
+
+    <h2>2. Overview &amp; principle</h2>
+    <p>Captain is a client for managing your Kubernetes clusters. The app needs no account, and there is no server of ours. We build in no analytics, tracking or advertising services, and we do not receive your cluster data or credentials. Data is not sold.</p>
+
+    <h2>3. Data the app processes</h2>
+    <p>All of the following data stays on your device or goes only to the services in section 4:</p>
+    <ul>
+      <li><strong>Cluster connections:</strong> name, API server address and credentials such as tokens, certificates, keys, AWS credentials and sign-in tokens. They are stored in the iOS Keychain.</li>
+      <li><strong>Settings:</strong> such as favorites, interface size and recently chosen options, also in the Keychain.</li>
+      <li><strong>Cluster content:</strong> resources, logs, events and metrics that the app loads directly from your cluster to display them.</li>
+      <li><strong>Widget data:</strong> a summary of cluster health, kept in the app's protected storage on your device so the widget can show it.</li>
+    </ul>
+
+    <h2>4. Connections to other services</h2>
+    <p>The app connects directly from your device to the services you set up. Their own privacy terms apply, and you or your organization are responsible for them.</p>
+    <ul>
+      <li><strong>Kubernetes API servers:</strong> the clusters you add, including services reachable through them such as Prometheus.</li>
+      <li><strong>Google and Microsoft:</strong> when you sign in for GKE or AKS.</li>
+      <li><strong>OIDC providers:</strong> the provider you enter for sign-in.</li>
+      <li><strong>AWS:</strong> For EKS, the app signs requests locally on your device. The cluster then verifies them with AWS.</li>
+    </ul>
+
+    <h2>5. Device permissions</h2>
+    <ul>
+      <li><strong>Camera:</strong> only to scan kubeconfig QR codes. Images are neither stored nor transmitted.</li>
+      <li><strong>Face ID:</strong> optional, to lock the app. iOS performs the check, and the app receives only the result.</li>
+      <li><strong>Notifications:</strong> optional, for cluster alerts. The app checks your clusters in the background and creates the notifications locally on the device.</li>
+    </ul>
+
+    <h2>6. Apple</h2>
+    <p>The app is distributed through Apple's App Store. Apple processes data under its own responsibility, for example about downloads. If you allow it in iOS, Apple provides us with aggregated usage statistics and crash reports. See Apple's privacy policy at <a href="https://www.apple.com/legal/privacy/">apple.com/legal/privacy</a>.</p>
+
+    <h2>7. Website</h2>
+    <p>The website is served through GitHub Pages (GitHub, Inc., USA). When you visit, GitHub processes technical data such as your IP address to deliver and secure the page. This may involve a transfer to the USA, which relies on an adequacy decision or EU Standard Contractual Clauses. The website uses no cookies and no tracking.</p>
+
+    <h2>8. Legal bases</h2>
+    <ul>
+      <li>Providing the app: Art. 6(1)(b) GDPR.</li>
+      <li>Optional features such as camera, Face ID and notifications: your consent, Art. 6(1)(a) GDPR.</li>
+      <li>Operating the website securely: legitimate interest, Art. 6(1)(f) GDPR.</li>
+    </ul>
+
+    <h2>9. Retention</h2>
+    <p>Data on your device stays until you remove it in the app. Remove your clusters before deleting the app, because iOS may keep Keychain entries afterwards. GitHub's retention periods apply to website logs.</p>
+
+    <h2>10. Your rights</h2>
+    <p>You have the right to access, rectification, erasure, restriction of processing, data portability and objection, and to withdraw consent with future effect. Because your app data is only on your device, you can view, change and delete it there yourself. You can also lodge a complaint with the Austrian Data Protection Authority (<a href="https://www.dsb.gv.at">dsb.gv.at</a>).</p>
+
+    <h2>11. Data security</h2>
+    <p>Credentials are stored in the iOS Keychain. Connections to your clusters are encrypted with TLS unless you configure a cluster otherwise, for example with an unencrypted address or disabled certificate verification.</p>
+
+    <h2>12. Minors</h2>
+    <p>The app is not aimed at people under 16.</p>
+
+    <h2>13. Changes to this policy</h2>
+    <p>We update this policy when features or the law change. The version published here applies.</p>
+
+    <h2>14. Contact</h2>
+    <p>For privacy questions, write to <a href="mailto:amber@pfaffenbauer.at">amber@pfaffenbauer.at</a>.</p>
+  </section>
+
+  <footer>
+    <a href="index.html">Home</a> &nbsp;·&nbsp; <a href="impressum.html">Impressum / Imprint</a>
+  </footer>
+</main>
+</body>
+</html>

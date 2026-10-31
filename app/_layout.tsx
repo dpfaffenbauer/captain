@@ -125,7 +125,7 @@ export default function RootLayout() {
               an accidental left-edge swipe. */}
           <Stack.Screen
             name="cluster/[id]"
-            options={{ headerShown: false, gestureEnabled: false }}
+            options={{ headerShown: false, gestureEnabled: false, title: 'Cluster' }}
           />
         </Stack>
         </SystemSafeArea>

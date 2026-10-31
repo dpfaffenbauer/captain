@@ -100,7 +100,7 @@ export default function KubeconfigImportScreen() {
         {contexts.length > 0 && (
           <View style={styles.actions}>
             <Button
-              title={`Import ${selected.size} clusters`}
+              title={`Import ${selected.size} ${selected.size === 1 ? 'cluster' : 'clusters'}`}
               onPress={() => void handleImport()}
               disabled={selected.size === 0}
             />

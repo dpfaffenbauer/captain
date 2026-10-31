@@ -37,6 +37,9 @@ import { loadHapticsSetting, setHapticsEnabled } from '../util/haptics';
 import { BottomSheet, StatusDot } from './kit';
 import { colors, radius } from './theme';
 
+const PRIVACY_URL = 'https://kube-captain.com/privacy.html';
+const IMPRINT_URL = 'https://kube-captain.com/impressum.html';
+
 function connectionColor(state: ConnectionState): string {
   switch (state) {
     case 'connected':
@@ -476,6 +479,14 @@ export function SettingsSheet({
         </TouchableOpacity>
       </View>
 
+      <View style={styles.legalLinks}>
+        <TouchableOpacity onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}>
+          <Text style={styles.legalLink}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => void WebBrowser.openBrowserAsync(IMPRINT_URL)}>
+          <Text style={styles.legalLink}>Imprint</Text>
+        </TouchableOpacity>
+      </View>
       <Text style={styles.version}>Captain 1.0.0</Text>
     </BottomSheet>
   );
@@ -700,6 +711,8 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   segmentTextActive: { color: '#fff' },
   settingValue: { color: 'rgba(242,245,250,0.5)', fontSize: 13 },
+  legalLinks: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 12 },
+  legalLink: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   version: { color: 'rgba(242,245,250,0.3)', fontSize: 11, textAlign: 'center' },
   alertMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   severityPill: {
