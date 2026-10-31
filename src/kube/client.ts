@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import { dump } from 'js-yaml';
 import { ApiResourceType, ClusterConfig, KubeList, KubeListItem } from '../types';
 import { kubeStream, KubeStreamHandle, KubeStreamHandlers } from './stream';
 import { kubeRequest, kubeRequestJson } from './transport';
@@ -173,7 +173,7 @@ export async function applyResource(
     `${resourceBasePath(type, namespace)}/${encodeURIComponent(name)}?fieldManager=captain&force=true`,
     {
       method: 'PATCH',
-      body: yaml.dump(cleaned, { noRefs: true, lineWidth: -1 }),
+      body: dump(cleaned, { noRefs: true, lineWidth: -1 }),
       contentType: 'application/apply-patch+yaml',
     }
   );

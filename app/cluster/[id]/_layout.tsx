@@ -1,7 +1,11 @@
-import { Stack, useGlobalSearchParams, usePathname, useSegments } from 'expo-router';
+import { Stack, useGlobalSearchParams, usePathname, useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import { RouterClusterNavProvider } from '../../../src/state/ClusterNav';
+import {
+  masterViewFromRoute,
+  restoreMasterRoute,
+  RouterClusterNavProvider,
+} from '../../../src/state/ClusterNav';
 import { ClusterScopeProvider } from '../../../src/state/ClusterScope';
 import { AccessProvider } from '../../../src/state/AccessContext';
 import { useClusterSession } from '../../../src/state/ClusterSession';
@@ -21,6 +25,7 @@ const TAB_BY_SEGMENT: Record<string, TabKey> = {
 };
 
 export default function ClusterLayout() {
+  const router = useRouter();
   const segments = useSegments();
   const pathname = usePathname();
   // The cluster/[id] layout stays mounted across cluster switches, so
@@ -46,13 +51,29 @@ export default function ClusterLayout() {
     session.rememberPath(id, query ? `${pathname}?${query}` : pathname);
   }, [id, pathname, params, session]);
 
+  // Narrowing the window (folding iPhone Duo, resizing) leaves the wide layout,
+  // whose navigation never reached the route: carry its current view over.
+  const wasWide = useRef(isWide);
+  useEffect(() => {
+    if (wasWide.current && !isWide) {
+      const wide = session.takeWideView();
+      if (wide) restoreMasterRoute(router, wide.clusterId, wide.view);
+    }
+    wasWide.current = isWide;
+  }, [isWide, router, session]);
+
   // Guard the first frame before the route param resolves.
   if (!id) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
 
   // iPad / macOS: a keep-alive host mounts every visited cluster and toggles
   // visibility, so switching is instant and each cluster keeps its state.
   if (isWide) {
-    return <ClusterWorkspaceHost initialClusterId={id} />;
+    return (
+      <ClusterWorkspaceHost
+        initialClusterId={id}
+        initialView={masterViewFromRoute(segments[segments.length - 1] ?? '', params)}
+      />
+    );
   }
 
   // Phone: one cluster at a time, driven by the router.

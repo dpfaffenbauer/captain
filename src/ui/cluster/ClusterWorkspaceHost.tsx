@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { MasterView } from '../../state/ClusterNav';
 import { ClusterSwitchProvider } from '../../state/ClusterSwitch';
 import { ClusterIconRail } from '../ClusterIconRail';
 import { colors } from '../theme';
@@ -10,7 +11,14 @@ import { ClusterWorkspace } from './ClusterWorkspace';
  * just toggles which one is visible, so switching clusters is instant and each
  * cluster keeps its full state (view, scroll, detail pane, dock, watches).
  */
-export function ClusterWorkspaceHost({ initialClusterId }: { initialClusterId: string }) {
+export function ClusterWorkspaceHost({
+  initialClusterId,
+  initialView,
+}: {
+  initialClusterId: string;
+  /** The view the route points at, so `initialClusterId` opens where the phone layout was. */
+  initialView: MasterView;
+}) {
   const [activeId, setActiveId] = useState(initialClusterId);
   const [visited, setVisited] = useState<string[]>([initialClusterId]);
 
@@ -38,7 +46,12 @@ export function ClusterWorkspaceHost({ initialClusterId }: { initialClusterId: s
         <ClusterIconRail clusterId={activeId} />
         <View style={{ flex: 1 }}>
           {visited.map((id) => (
-            <ClusterWorkspace key={id} clusterId={id} visible={id === activeId} />
+            <ClusterWorkspace
+              key={id}
+              clusterId={id}
+              visible={id === activeId}
+              initialView={id === initialClusterId ? initialView : undefined}
+            />
           ))}
         </View>
       </View>

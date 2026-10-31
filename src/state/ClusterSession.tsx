@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef } from 'react';
+import type { MasterView } from './ClusterNav';
 
 /**
  * Remembers, per cluster, where the user last was — the in-cluster route and
@@ -21,6 +22,10 @@ interface ClusterSessionValue {
   rememberPath(id: string, lastPath: string): void;
   rememberNamespace(id: string, namespace: string): void;
   get(id: string): ClusterSessionEntry | undefined;
+  /** The wide layout's visible cluster and view; its navigation is not in the route. */
+  rememberWideView(clusterId: string, view: MasterView): void;
+  /** Reads and clears that view when the window narrows (e.g. folding iPhone Duo). */
+  takeWideView(): { clusterId: string; view: MasterView } | null;
 }
 
 const ClusterSessionContext = createContext<ClusterSessionValue | undefined>(undefined);
@@ -40,9 +45,21 @@ export function ClusterSessionProvider({ children }: { children: React.ReactNode
 
   const get = useCallback((id: string) => sessions.current.get(id), []);
 
+  const wideView = useRef<{ clusterId: string; view: MasterView } | null>(null);
+
+  const rememberWideView = useCallback((clusterId: string, view: MasterView) => {
+    wideView.current = { clusterId, view };
+  }, []);
+
+  const takeWideView = useCallback(() => {
+    const taken = wideView.current;
+    wideView.current = null;
+    return taken;
+  }, []);
+
   const value = useMemo(
-    () => ({ rememberPath, rememberNamespace, get }),
-    [rememberPath, rememberNamespace, get]
+    () => ({ rememberPath, rememberNamespace, get, rememberWideView, takeWideView }),
+    [rememberPath, rememberNamespace, get, rememberWideView, takeWideView]
   );
 
   return <ClusterSessionContext.Provider value={value}>{children}</ClusterSessionContext.Provider>;
