@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
+  RawText,
   ScrollView,
   StyleSheet,
   Switch,
@@ -407,8 +408,8 @@ export function SettingsSheet({
             trackColor={{ true: colors.accent, false: 'rgba(255,255,255,0.14)' }}
           />
         </View>
-        <View style={[styles.settingRow, styles.settingDivider]}>
-          <View style={{ flex: 1, gap: 2 }}>
+        <View style={[styles.settingRowStacked, styles.settingDivider]}>
+          <View style={{ gap: 2 }}>
             <Text style={styles.settingTitle}>Interface size</Text>
             <Text style={styles.rowSub}>Scale text and controls (bigger on macOS)</Text>
           </View>
@@ -421,9 +422,9 @@ export function SettingsSheet({
                   style={[styles.segmentItem, active && styles.segmentItemActive]}
                   onPress={() => setScale(option.value)}
                 >
-                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                  <RawText style={[styles.segmentText, active && styles.segmentTextActive]}>
                     {option.label}
-                  </Text>
+                  </RawText>
                 </TouchableOpacity>
               );
             })}
@@ -678,6 +679,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
   },
+  settingRowStacked: { gap: 10, paddingVertical: 12 },
   settingDivider: { borderTopColor: colors.borderFaint, borderTopWidth: StyleSheet.hairlineWidth },
   settingTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
   segment: {
@@ -687,7 +689,13 @@ const styles = StyleSheet.create({
     padding: 3,
     gap: 2,
   },
-  segmentItem: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill },
+  segmentItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
   segmentItemActive: { backgroundColor: colors.accent },
   segmentText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   segmentTextActive: { color: '#fff' },

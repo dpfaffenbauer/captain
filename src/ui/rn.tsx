@@ -1,7 +1,35 @@
 import React from 'react';
 import { StyleSheet, Text as RNText, TextInput as RNTextInput } from 'react-native';
 
-export * from 'react-native';
+// Named rather than `export *`: React Refresh reads every export in dev, which
+// would run react-native's lazy getters and throw on PushNotificationIOS.
+export {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Switch,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+export type {
+  LayoutChangeEvent,
+  ScrollViewInstance,
+  TextInputProps,
+  ViewInstance,
+  ViewStyle,
+} from 'react-native';
 
 /**
  * Global, crisp interface zoom.
@@ -17,7 +45,7 @@ export * from 'react-native';
  * layer and turns blurry.
  *
  * Consumers import `Text`/`TextInput` from this module instead of
- * 'react-native'; every other React Native export is re-exported untouched.
+ * 'react-native'; the other React Native exports the app uses pass through.
  */
 
 let currentScale = 1;
