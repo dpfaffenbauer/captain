@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from './rn';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewInstance } from './rn';
 import { abbreviationFor, categorizeResourceTypes, ResourceCategory } from '../kube/categories';
 import { discoverResourceTypesCached } from '../kube/client';
 import { useAccessibleResourceTypes } from '../state/AccessContext';
@@ -52,7 +52,7 @@ export function Sidebar({ clusterId }: { clusterId: string }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [switcherAnchor, setSwitcherAnchor] = useState<FlyoutAnchor | null>(null);
-  const pillRef = useRef<View>(null);
+  const pillRef = useRef<ViewInstance>(null);
   const [nsOpen, setNsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 

@@ -26,7 +26,7 @@ on:
         options: [ios, android, all]
 
 # Only the newest run per ref survives: merging a second PR to main cancels
-# the in-flight build (macos-26 minutes bill 10x) so just the latest commit
+# the in-flight build (macOS minutes bill 10x) so just the latest commit
 # builds & submits to TestFlight instead of racing two uploads.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
@@ -49,12 +49,12 @@ jobs:
   app-build:
     name: App build (local — no EAS cloud)
     # macOS runner so the build runs HERE, not on Expo's paid cloud.
-    # Pinned to macos-26 (NOT macos-latest, which is still macos-15 /
-    # Xcode 16 / iOS 18.5 SDK): App Store Connect now rejects uploads not
-    # built with the iOS 26 SDK. macos-26 ships Xcode 26.2 by default.
+    # Pinned to xcode-27 (NOT macos-latest, which is still macos-26 / iOS 26
+    # SDK): only the iOS 27 SDK makes the app resizable, which iPhone Duo needs
+    # to adapt when it is folded or shown in split view.
     # NOTE: GitHub macOS minutes bill 10x on private repos — Expo-free,
     # not GitHub-free. The only truly $0 path is building on your own Mac.
-    runs-on: macos-26
+    runs-on: xcode-27
     needs: [typecheck]
     timeout-minutes: 120
     # Push to main → build; also manual dispatch / v* tag.
@@ -69,7 +69,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - uses: expo/expo-github-action@v8
@@ -102,7 +102,7 @@ jobs:
             if [ "$PROFILE" = "production" ]; then
               # --no-wait: fire-and-forget. Without it, `eas submit` polls
               # App Store Connect until processing finishes (can take 30min+)
-              # and would burn macos-26 minutes (billed 10x). The actual
+              # and would burn macOS minutes (billed 10x). The actual
               # upload is done in ~1min; ASC processing status is visible in
               # the Expo dashboard and on App Store Connect.
               eas submit --non-interactive --no-wait \

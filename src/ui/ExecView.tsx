@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ScrollViewInstance,
   StyleSheet,
   Text,
   TextInput,
@@ -50,7 +51,7 @@ export function ExecView({ cluster, namespace, name, container: containerParam, 
   const [lines, setLines] = useState<TermLine[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   // Interactive PTY mode: one persistent `kubectl exec -it`-style session.
   const [interactive, setInteractive] = useState(false);

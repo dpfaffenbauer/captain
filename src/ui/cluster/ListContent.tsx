@@ -91,6 +91,9 @@ function sortPodsBySeverity(items: KubeListItem[]): KubeListItem[] {
  * works both as a pushed route (phone) and as keep-alive content in the wide
  * split layout. Navigation goes through ClusterNav.
  */
+/** Below this, the name and status columns of the table get too narrow to read. */
+const MIN_FLEXIBLE_COLUMNS_WIDTH = 200;
+
 export function ListContent({ clusterId, type }: { clusterId: string; type: ApiResourceType }) {
   const { getById } = useClusters();
   const cluster = getById(clusterId);
@@ -112,7 +115,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
 
   // iPad / landscape: list on the left, inspector pane on the right.
-  const { isWide } = useResponsiveLayout();
+  const { isWide, masterWidth } = useResponsiveLayout();
 
   const isPods = type.group === '' && type.kind === 'Pod';
   const isDeployments = type.group === 'apps' && type.kind === 'Deployment';
@@ -539,6 +542,11 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
     ];
   }
 
+  // Too narrow a master column (unfolded iPhone Duo, iPad portrait) would cut
+  // names and statuses down to a few letters: cards read better there.
+  const fixedColumnsWidth = columns.reduce((sum, col) => sum + Number(col.style.width ?? 0), 0);
+  const showTable = isWide && masterWidth - fixedColumnsWidth >= MIN_FLEXIBLE_COLUMNS_WIDTH;
+
   const toggleSort = (key: string) =>
     setSort((current) =>
       current?.key === key
@@ -623,7 +631,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
               onPress={() => void load(false, continueToken)}
             />
           </View>
-        ) : null
+        ) : undefined
       }
       refreshControl={
         <RefreshControl
@@ -664,7 +672,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
               onPress={() => void load(false, continueToken)}
             />
           </View>
-        ) : null
+        ) : undefined
       }
       renderItem={renderItem}
     />
@@ -723,7 +731,7 @@ export function ListContent({ clusterId, type }: { clusterId: string; type: ApiR
         </View>
       ) : loading ? (
         <Loading />
-      ) : isWide ? (
+      ) : showTable ? (
         tableView
       ) : (
         listView

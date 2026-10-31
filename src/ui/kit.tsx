@@ -8,6 +8,7 @@ import {
   View,
   ViewStyle,
 } from './rn';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { cardGradient, colors, radius, spacing } from './theme';
 
@@ -205,11 +206,13 @@ export function BottomSheet({
   title: string;
   children: React.ReactNode;
 }) {
+  // A Modal renders outside the root layout's horizontal safe area.
+  const { left, right } = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetBackdropWrap}>
         <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { marginLeft: left, marginRight: right }]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{title}</Text>
           {children}

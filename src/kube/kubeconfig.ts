@@ -1,7 +1,7 @@
-import yaml from 'js-yaml';
 import { DEFAULT_GKE_CLIENT_ID } from '../auth/oauth';
 import { AuthConfig, ClusterConfig } from '../types';
 import { newId } from '../util/format';
+import { parseYaml } from '../util/yaml';
 
 const GKE_IMPORT_WARNING = DEFAULT_GKE_CLIENT_ID
   ? 'GKE: Please sign in with Google.'
@@ -112,7 +112,7 @@ function authFromUser(user: Record<string, unknown>, warnings: string[]): AuthCo
 
 /** Parses a kubeconfig YAML document into importable cluster configurations. */
 export function parseKubeconfig(text: string): ImportedContext[] {
-  const parsed = yaml.load(text) as KubeconfigFile | undefined;
+  const parsed = parseYaml(text) as KubeconfigFile | undefined;
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Could not read the kubeconfig');
   }

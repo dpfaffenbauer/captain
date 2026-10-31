@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from './rn';
+import { ScrollView, ScrollViewInstance, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from './rn';
 import { getPodLogs, streamPodLogs } from '../kube/client';
 import { isStreamingAvailable, KubeStreamHandle } from '../kube/stream';
 import { ClusterConfig } from '../types';
@@ -63,7 +63,7 @@ export function LogsView({
   const [streamEnded, setStreamEnded] = useState(false);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const streamRef = useRef<KubeStreamHandle | null>(null);
 
   const canStream = isStreamingAvailable();

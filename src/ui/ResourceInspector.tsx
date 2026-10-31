@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import { dump } from 'js-yaml';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from './rn';
 import { getResource, listEventsFor, ResourceEvent } from '../kube/client';
@@ -63,7 +63,7 @@ export function ResourceInspector({
 
   const yamlText = useMemo(
     () =>
-      manifest ? yaml.dump(stripManagedFields(manifest), { noRefs: true, lineWidth: -1 }) : '',
+      manifest ? dump(stripManagedFields(manifest), { noRefs: true, lineWidth: -1 }) : '',
     [manifest]
   );
   const sections = useMemo(

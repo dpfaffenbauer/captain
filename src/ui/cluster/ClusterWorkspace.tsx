@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   ClusterNav,
@@ -7,6 +7,7 @@ import {
 } from '../../state/ClusterNav';
 import { ClusterScopeProvider } from '../../state/ClusterScope';
 import { AccessProvider } from '../../state/AccessContext';
+import { useClusterSession } from '../../state/ClusterSession';
 import { DetailSelectionProvider, useDetailSelection } from '../../state/DetailSelection';
 import { DockProvider, useDock } from '../../state/DockContext';
 import { SidePaneProvider } from '../../state/SidePaneContext';
@@ -27,9 +28,11 @@ const REPLACE_KINDS = new Set<MasterView['kind']>(['dashboard', 'browse', 'event
 export function ClusterWorkspace({
   clusterId,
   visible,
+  initialView,
 }: {
   clusterId: string;
   visible: boolean;
+  initialView?: MasterView;
 }) {
   return (
     <View
@@ -41,7 +44,7 @@ export function ClusterWorkspace({
           <SidePaneProvider>
             <DetailSelectionProvider>
               <DockProvider>
-                <WorkspaceInner clusterId={clusterId} />
+                <WorkspaceInner clusterId={clusterId} visible={visible} initialView={initialView} />
               </DockProvider>
             </DetailSelectionProvider>
           </SidePaneProvider>
@@ -51,11 +54,26 @@ export function ClusterWorkspace({
   );
 }
 
-function WorkspaceInner({ clusterId }: { clusterId: string }) {
-  const [history, setHistory] = useState<MasterView[]>([{ kind: 'dashboard' }]);
+function WorkspaceInner({
+  clusterId,
+  visible,
+  initialView = { kind: 'dashboard' },
+}: {
+  clusterId: string;
+  visible: boolean;
+  initialView?: MasterView;
+}) {
+  const [history, setHistory] = useState<MasterView[]>(() =>
+    REPLACE_KINDS.has(initialView.kind) ? [initialView] : [{ kind: 'dashboard' }, initialView]
+  );
   const current = history[history.length - 1];
   const detail = useDetailSelection();
   const dock = useDock();
+  const session = useClusterSession();
+
+  useEffect(() => {
+    if (visible) session.rememberWideView(clusterId, current);
+  }, [visible, clusterId, current, session]);
 
   const nav = useMemo<ClusterNav>(
     () => ({

@@ -1,23 +1,63 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
-import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from './rn';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, LayoutChangeEvent, RawText, StyleSheet, Text, TouchableOpacity, View } from './rn';
 import { hapticTap } from '../util/haptics';
 import { TabIcon, TABS, TabKey } from './clusterTabs';
+import { useHasSystemRail, useRailContent } from './SystemSafeArea';
 import { colors, radius } from './theme';
 
 export type { TabKey };
 
 const SPRING = { friction: 9, tension: 110 };
 
-export function FloatingTabBar({
-  clusterId,
-  active,
-  visible = true,
-}: {
+interface TabBarProps {
   clusterId: string;
   active: TabKey;
   visible?: boolean;
-}) {
+}
+
+export function FloatingTabBar(props: TabBarProps) {
+  const hasRail = useHasSystemRail();
+  return hasRail ? <RailTabBar {...props} /> : <BottomTabBar {...props} />;
+}
+
+/** iPhone Duo: the tabs move into the system rail, clear of the content. */
+function RailTabBar({ clusterId, active, visible = true }: TabBarProps) {
+  const router = useRouter();
+  const content = useMemo(
+    () =>
+      visible ? (
+        <View style={styles.railWrap} pointerEvents="box-none">
+          <View style={styles.railBar}>
+            {TABS.map((tab) => {
+              const isActive = tab.key === active;
+              const color = isActive ? '#fff' : colors.textDim;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.railTab, isActive && styles.railTabActive]}
+                  onPress={() => {
+                    if (!isActive) {
+                      hapticTap();
+                      router.replace(`/cluster/${clusterId}/${tab.path}` as never);
+                    }
+                  }}
+                >
+                  <TabIcon tab={tab.key} color={color} />
+                  <RawText style={[styles.label, { color }]}>{tab.label}</RawText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      ) : null,
+    [active, clusterId, router, visible]
+  );
+  useRailContent(content);
+  return null;
+}
+
+function BottomTabBar({ clusterId, active, visible = true }: TabBarProps) {
   const router = useRouter();
   const layouts = useRef<Partial<Record<TabKey, { x: number; width: number }>>>({});
   const placed = useRef(false);
@@ -138,4 +178,28 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   label: { fontSize: 10, fontWeight: '600' },
+  railWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 26,
+    alignItems: 'center',
+  },
+  railBar: {
+    backgroundColor: 'rgba(23,30,45,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 26,
+    padding: 5,
+    gap: 4,
+  },
+  railTab: {
+    alignItems: 'center',
+    gap: 3,
+    width: 62,
+    paddingTop: 9,
+    paddingBottom: 8,
+    borderRadius: 21,
+  },
+  railTabActive: { backgroundColor: colors.accentSoft },
 });

@@ -147,7 +147,7 @@ modules/kube-http/            Native iOS module (Swift): TLS with custom CA,
 
 ## Setup
 
-Prerequisites: macOS with Xcode 16+, Node 20+, CocoaPods.
+Prerequisites: macOS with Xcode 26.4+, Node 22.13+, CocoaPods.
 
 ```sh
 npm install

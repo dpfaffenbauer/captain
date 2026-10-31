@@ -1,4 +1,4 @@
-import pako from 'pako';
+import { ungzip } from 'pako';
 import { ClusterConfig } from '../types';
 import { base64Decode } from '../util/base64';
 import { kubeRequestJson } from './transport';
@@ -142,7 +142,7 @@ function decodeReleasePayload(data: string): any {
   const inner = base64Decode(base64Decode(data));
   let json: string;
   if (inner.charCodeAt(0) === 0x1f && inner.charCodeAt(1) === 0x8b) {
-    json = pako.ungzip(binaryStringToBytes(inner), { to: 'string' });
+    json = ungzip(binaryStringToBytes(inner), { toText: true });
   } else {
     json = inner;
   }

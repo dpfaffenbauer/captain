@@ -9,6 +9,7 @@ import { ClustersProvider } from '../src/state/ClustersContext';
 import { FavoritesProvider } from '../src/state/FavoritesContext';
 import { UiScaleProvider, useUiScale } from '../src/state/UiScaleContext';
 import { setTextScale } from '../src/ui/rn';
+import { SystemSafeArea } from '../src/ui/SystemSafeArea';
 import { colors } from '../src/ui/theme';
 import { authenticate, loadAppLockSetting } from '../src/util/applock';
 import { loadHapticsSetting } from '../src/util/haptics';
@@ -105,6 +106,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <AppLockGate>
         <ZoomContainer>
+        <SystemSafeArea>
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: colors.background },
@@ -114,7 +116,7 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="index" options={{ headerShown: false, title: 'Clusters' }} />
           <Stack.Screen name="open" options={{ headerShown: false }} />
           <Stack.Screen name="cluster-form" options={{ title: 'Cluster' }} />
           <Stack.Screen name="kubeconfig-import" options={{ title: 'Import kubeconfig' }} />
@@ -126,6 +128,7 @@ export default function RootLayout() {
             options={{ headerShown: false, gestureEnabled: false }}
           />
         </Stack>
+        </SystemSafeArea>
         </ZoomContainer>
       </AppLockGate>
       </ClusterStatusProvider>

@@ -72,6 +72,50 @@ export function useClusterNav(): ClusterNav {
   return context;
 }
 
+/**
+ * Maps a phone route back to its master view, so widening the window (e.g.
+ * unfolding iPhone Duo) stays on the same screen. Screens without a master view
+ * of their own fall back to the closest one that has.
+ */
+export function masterViewFromRoute(
+  segment: string,
+  params: Record<string, string | string[] | undefined>
+): MasterView {
+  const param = (key: string) => {
+    const value = params[key];
+    return typeof value === 'string' ? value : '';
+  };
+  switch (segment) {
+    case 'browse':
+    case 'events':
+    case 'search':
+    case 'gitops':
+    case 'forwards':
+    case 'alerts':
+      return { kind: segment };
+    case 'helm':
+    case 'helm-release':
+      return { kind: 'helm' };
+    case 'kinds':
+      return { kind: 'kinds', category: param('category'), title: param('title') };
+    case 'list':
+    case 'item':
+      return {
+        kind: 'list',
+        type: {
+          group: param('group'),
+          version: param('version') || 'v1',
+          plural: param('plural'),
+          kind: param('kind'),
+          namespaced: param('namespaced') === '1',
+          verbs: param('verbs').split(',').filter(Boolean),
+        },
+      };
+    default:
+      return { kind: 'dashboard' };
+  }
+}
+
 /** Maps a master view to its Expo Router route (used by the phone layout). */
 function masterRoute(clusterId: string, view: MasterView): { pathname: string; params: Record<string, string> } {
   const id = clusterId;
@@ -115,6 +159,23 @@ function masterRoute(clusterId: string, view: MasterView): { pathname: string; p
 
 /** The three primary tabs replace; deeper views push (so back returns to them). */
 const REPLACE_KINDS = new Set<MasterView['kind']>(['dashboard', 'browse', 'events']);
+
+/**
+ * Opens a view coming from the wide layout, which has no routes of its own.
+ * Deeper views go on top of the dashboard so that back stays inside the cluster.
+ */
+export function restoreMasterRoute(
+  router: ReturnType<typeof useRouter>,
+  clusterId: string,
+  view: MasterView
+) {
+  if (REPLACE_KINDS.has(view.kind)) {
+    router.replace(masterRoute(clusterId, view) as never);
+    return;
+  }
+  router.replace(masterRoute(clusterId, { kind: 'dashboard' }) as never);
+  router.push(masterRoute(clusterId, view) as never);
+}
 
 /**
  * Phone navigation: every action is an Expo Router transition. Detail targets

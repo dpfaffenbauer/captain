@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import { dump } from 'js-yaml';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -53,6 +53,7 @@ import { YamlView } from './YamlView';
 import { Button, EmptyState, ErrorBox, Loading } from './components';
 import { colors, radius, spacing } from './theme';
 import { ageOf } from '../util/format';
+import { parseYaml } from '../util/yaml';
 
 /** managedFields is huge and never hand-edited; hide it like kubectl does. */
 function stripManagedFields(manifest: Record<string, unknown>): Record<string, unknown> {
@@ -185,7 +186,7 @@ export function ItemView({
 
   const yamlText = useMemo(
     () =>
-      manifest ? yaml.dump(stripManagedFields(manifest), { noRefs: true, lineWidth: -1 }) : '',
+      manifest ? dump(stripManagedFields(manifest), { noRefs: true, lineWidth: -1 }) : '',
     [manifest]
   );
   const sections = useMemo(
@@ -265,7 +266,7 @@ export function ItemView({
   const handleReview = () => {
     setError('');
     try {
-      const parsed = yaml.load(draft);
+      const parsed = parseYaml(draft);
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('The YAML document is empty or invalid.');
       }
@@ -284,7 +285,7 @@ export function ItemView({
   /** Save step 2: server-side apply — immune to the PUT 409 conflict race. */
   const handleApply = async () => {
     await runAction(async () => {
-      const parsed = yaml.load(draft) as Record<string, unknown>;
+      const parsed = parseYaml(draft) as Record<string, unknown>;
       try {
         await applyResource(cluster, type, name, parsed, namespace);
       } catch (caught) {

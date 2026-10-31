@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import { dump } from 'js-yaml';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from './rn';
 import {
@@ -64,7 +64,7 @@ export function HelmReleaseView({
   const valuesYaml = useMemo(
     () =>
       detail?.values && Object.keys(detail.values).length > 0
-        ? yaml.dump(detail.values, { noRefs: true, lineWidth: -1 })
+        ? dump(detail.values, { noRefs: true, lineWidth: -1 })
         : '',
     [detail]
   );
